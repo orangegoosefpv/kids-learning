@@ -452,9 +452,22 @@
       typedRow.classList.remove('hidden');
       const inp = $('#math-answer-input');
       inp.value = '';
+      inp.readOnly = false;
+      inp.disabled = false;
+      const submitBtn = $('#math-submit');
+      if (submitBtn) submitBtn.disabled = false;
       inp.focus();
-      $('#math-submit').onclick = () => submitMath(inp.value);
-      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); submitMath(inp.value); } };
+      $('#math-submit').onclick = () => {
+        if (mathAwaitEnter) { advanceMath(); return; }
+        submitMath(inp.value);
+      };
+      inp.onkeydown = (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (mathAwaitEnter) advanceMath();
+        else submitMath(inp.value);
+      };
     } else {
       (prob.choices || []).forEach(ch => {
         const btn = document.createElement('button');
@@ -462,7 +475,7 @@
         btn.className = 'choice-btn';
         btn.textContent = String(ch);
         btn.addEventListener('click', () => {
-          if (MathCourse.getState().locked) return;
+          if (MathCourse.getState().locked || mathAwaitEnter) return;
           submitMath(ch, btn);
         });
         choices.appendChild(btn);
@@ -525,9 +538,19 @@
 
     mathAwaitEnter = true;
     $('#math-next-row')?.classList.remove('hidden');
-    if (mathAdvanceTimer) clearTimeout(mathAdvanceTimer);
-    // Longer pause when showing visual teach so kids can look
-    mathAdvanceTimer = setTimeout(() => advanceMath(), res.ok ? 650 : 2200);
+    if (mathAdvanceTimer) { clearTimeout(mathAdvanceTimer); mathAdvanceTimer = null; }
+    // Manual Next only — give time to review teach visuals / correct answer
+    if (res.ok) {
+      $('#math-feedback').textContent = '⭐ Yes! Tap Next when ready.';
+    } else {
+      $('#math-feedback').textContent = "Let's see how it works — tap Next when you're ready.";
+    }
+    // Lock further answers until Next
+    $$('.choice-btn', $('#math-choices')).forEach(b => { b.disabled = true; });
+    const typedInp = $('#math-answer-input');
+    if (typedInp) { typedInp.readOnly = true; }
+    const submitBtn = $('#math-submit');
+    if (submitBtn) submitBtn.disabled = true;
   }
 
   function advanceMath() {
