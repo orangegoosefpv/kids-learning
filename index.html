@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light" />
+  <title>Kids Learning Lab</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="bg-blobs" aria-hidden="true">
+    <span></span><span></span><span></span><span></span>
+  </div>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">🌈</div>
+        <div>
+          <h1>Kids Learning Lab</h1>
+          <div class="tagline">Type · Read · Spell · Math · Science · Code · Chess</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-sound" title="Sound on/off">🔊 Sound</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-fullscreen" title="Fullscreen">⛶ Fullscreen</button>
+        <div class="stars-display" title="Total stars">⭐ <span class="stars-count">0</span></div>
+      </div>
+    </header>
+
+    <!-- HOME -->
+    <section id="screen-home" class="screen active" aria-label="Home">
+      <div id="profile-row" class="profile-row"></div>
+      <p class="section-sub">Pick a player — activities use that kid’s grade automatically!</p>
+      <div class="hub-grid">
+        <div class="hub-card">
+          <button type="button" class="btn btn-xl btn-primary" id="nav-typing">
+            <span class="emoji">⌨️</span>
+            <span class="label">Typing</span>
+            <span class="hint">Letters → words → sentences</span>
+          </button>
+        </div>
+        <div class="hub-card">
+          <button type="button" class="btn btn-xl btn-secondary" id="nav-math">
+            <span class="emoji">🔢</span>
+            <span class="label">Math</span>
+            <span class="hint">Matched to your grade</span>
+          </button>
+        </div>
+        <div class="hub-card">
+          <button type="button" class="btn btn-xl btn-read" id="nav-reading">
+            <span class="emoji">📖</span>
+            <span class="label">Reading</span>
+            <span class="hint">Phonics · passages · questions</span>
+          </button>
+        </div>
+        <div class="hub-card">
+          <button type="button" class="btn btn-xl btn-spell" id="nav-spelling">
+            <span class="emoji">✏️</span>
+            <span class="label">Spelling</span>
+            <span class="hint">Memorize &amp; type the word</span>
+          </button>
+        </div>
+        <div class="hub-card">
+          <button type="button" class="btn btn-xl btn-science" id="nav-science">
+            <span class="emoji">🔬</span>
+            <span class="label">Science</span>
+            <span class="hint">Fun facts · explorers</span>
+          </button>
+        </div>
+        <div class="hub-card">
+          <button type="button" class="btn btn-xl btn-success" id="nav-stem">
+            <span class="emoji">🤖</span>
+            <span class="label">Code Path</span>
+            <span class="hint">Program a robot · 12 levels</span>
+          </button>
+        </div>
+        <div class="hub-card">
+          <button type="button" class="btn btn-xl btn-chess" id="nav-chess">
+            <span class="emoji">♟️</span>
+            <span class="label">Chess</span>
+            <span class="hint">Learn pieces · fun quizzes</span>
+          </button>
+        </div>
+      </div>
+      <div id="hub-stats" class="stats-bar"></div>
+      <div id="parent-tracker" class="parent-tracker" aria-label="Parent answer tracker">
+        <div class="parent-tracker-row">
+          <span id="tracker-count" class="tracker-count">📊 Excel tracker · 0 answers</span>
+          <button type="button" class="btn btn-sm btn-tracker" id="btn-tracker-download">Download Excel tracker</button>
+          <button type="button" class="btn btn-sm btn-tracker-alt" id="btn-tracker-update">Update Excel file…</button>
+        </div>
+        <p id="tracker-note" class="tracker-note">Parents: download a spreadsheet of every answer to review at home.</p>
+      </div>
+    </section>
+
+    <!-- TYPING -->
+    <section id="screen-typing" class="screen" aria-label="Typing">
+      <div class="panel-header">
+        <h2>⌨️ Typing Trainer</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div class="stars-display">⭐ <span class="stars-count">0</span></div>
+          <button type="button" class="btn btn-speak" id="typing-speak" title="Read aloud" aria-label="Read aloud">🔊</button>
+          <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
+        </div>
+      </div>
+      <div id="typing-levels" class="level-pills"></div>
+      <p id="typing-hint" class="level-info"></p>
+      <div class="card">
+        <div id="typing-streak" class="streak-banner"></div>
+        <div id="typing-target" class="typing-target" aria-live="polite"></div>
+        <input id="typing-input" class="typing-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type here…" aria-label="Type the text shown above" />
+        <div class="typing-meta">
+          <div>WPM: <strong id="typing-wpm">0</strong></div>
+          <div>Accuracy: <strong id="typing-acc">100%</strong></div>
+          <div>Streak: <strong id="typing-streak-num">0</strong></div>
+        </div>
+        <div id="typing-feedback" class="feedback"></div>
+        <div id="typing-next-row" class="next-row hidden">
+          <p id="typing-enter-hint" class="enter-hint">Press Enter or tap Next</p>
+          <button type="button" class="btn btn-lg btn-next" id="typing-next">Next ▶</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- MATH -->
+    <section id="screen-math" class="screen" aria-label="Math">
+      <div class="panel-header">
+        <h2 id="math-title">🔢 Math Adventure</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div class="stars-display">⭐ <span class="stars-count">0</span></div>
+          <button type="button" class="btn btn-speak" id="math-speak" title="Read aloud" aria-label="Read aloud">🔊</button>
+          <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
+        </div>
+      </div>
+
+      <div id="math-course-pick" class="hidden">
+        <p class="section-sub">Choose a level that fits today:</p>
+        <div class="hub-grid">
+          <div class="hub-card">
+            <button type="button" class="btn btn-xl btn-warn" data-math-course="prek">
+              <span class="emoji">🐣</span>
+              <span class="label">Pre-K</span>
+              <span class="hint">Counting &amp; numbers 1–10</span>
+            </button>
+          </div>
+          <div class="hub-card">
+            <button type="button" class="btn btn-xl btn-secondary" data-math-course="grade2">
+              <span class="emoji">📗</span>
+              <span class="label">Grade 2</span>
+              <span class="hint">Add · subtract · skip count</span>
+            </button>
+          </div>
+          <div class="hub-card">
+            <button type="button" class="btn btn-xl btn-primary" data-math-course="grade3">
+              <span class="emoji">📘</span>
+              <span class="label">Grade 3</span>
+              <span class="hint">Multiply · divide · fractions</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="math-play" class="hidden">
+        <div class="level-info" id="math-round-label">Round 1</div>
+        <div class="progress-track"><div id="math-progress-fill" class="progress-fill"></div></div>
+        <div class="card">
+          <div id="math-visual" class="math-visual"></div>
+          <div id="math-prompt" class="math-prompt"></div>
+          <div id="math-choices" class="choice-grid"></div>
+          <div id="math-typed-row" class="math-answer-row hidden">
+            <input id="math-answer-input" class="math-answer-input" type="number" inputmode="numeric" aria-label="Your answer" />
+            <button type="button" class="btn btn-lg btn-success" id="math-submit">Check ✓</button>
+          </div>
+          <div id="math-feedback" class="feedback"></div>
+          <div id="math-next-row" class="next-row hidden">
+            <p id="math-enter-hint" class="enter-hint">Press Enter or tap Next</p>
+            <button type="button" class="btn btn-lg btn-next" id="math-next">Next ▶</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- READING -->
+    <section id="screen-reading" class="screen" aria-label="Reading">
+      <div class="panel-header">
+        <h2 id="reading-title">📖 Reading</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div class="stars-display">⭐ <span class="stars-count">0</span></div>
+          <button type="button" class="btn btn-speak" id="reading-speak" title="Read aloud" aria-label="Read aloud">🔊</button>
+          <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
+        </div>
+      </div>
+      <p id="reading-grade-tip" class="reading-grade-tip hidden">Tip: read one sentence at a time · tap 🔊 Hear it if you need help</p>
+      <div class="level-info" id="reading-round-label">Round 1</div>
+      <div class="progress-track"><div id="reading-progress-fill" class="progress-fill"></div></div>
+      <div class="card">
+        <div id="reading-show" class="reading-show" aria-live="polite"></div>
+        <div id="reading-passage" class="reading-passage hidden"></div>
+        <div id="reading-assist" class="reading-assist hidden">
+          <div id="reading-chunk-view" class="reading-chunk-view" aria-live="polite"></div>
+          <div class="reading-assist-bar">
+            <button type="button" class="btn btn-sm" id="reading-sent-prev" title="Previous sentence">◀</button>
+            <button type="button" class="btn btn-sm btn-hear" id="reading-hear-sent" title="Hear this sentence">🔊 Hear it</button>
+            <button type="button" class="btn btn-sm" id="reading-sent-next" title="Next sentence">▶</button>
+            <span id="reading-sent-pos" class="reading-sent-pos"></span>
+          </div>
+          <p class="reading-assist-hint">Tap a sentence to focus · tap a word to hear it</p>
+        </div>
+        <div id="reading-prompt" class="math-prompt"></div>
+        <div id="reading-choices" class="choice-grid"></div>
+        <div id="reading-feedback" class="feedback"></div>
+        <div id="reading-next-row" class="next-row hidden">
+          <p id="reading-enter-hint" class="enter-hint">Press Enter or tap Next</p>
+          <button type="button" class="btn btn-lg btn-next" id="reading-next">Next ▶</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SPELLING -->
+    <section id="screen-spelling" class="screen" aria-label="Spelling">
+      <div class="panel-header">
+        <h2 id="spelling-title">✏️ Spelling</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div class="stars-display">⭐ <span class="stars-count">0</span></div>
+          <button type="button" class="btn btn-speak" id="spelling-speak" title="Read aloud" aria-label="Read aloud">🔊</button>
+          <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
+        </div>
+      </div>
+      <p id="spelling-hint" class="level-info">Look at the word, then type it!</p>
+      <div class="card">
+        <div id="spelling-emoji" class="spelling-emoji"></div>
+        <div id="spelling-word" class="spelling-word" aria-live="polite"></div>
+        <div id="spelling-scramble" class="spelling-scramble"></div>
+        <input id="spelling-input" class="typing-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the word…" aria-label="Type the spelling word" />
+        <div id="spelling-feedback" class="feedback"></div>
+        <div id="spelling-next-row" class="next-row hidden">
+          <p id="spelling-enter-hint" class="enter-hint">Press Enter or tap Next</p>
+          <button type="button" class="btn btn-lg btn-next" id="spelling-next">Next word ▶</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCIENCE -->
+    <section id="screen-science" class="screen" aria-label="Science">
+      <div class="panel-header">
+        <h2 id="science-title">🔬 Science Explorers</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div class="stars-display">⭐ <span class="stars-count">0</span></div>
+          <button type="button" class="btn btn-speak" id="science-speak" title="Read aloud" aria-label="Read aloud">🔊</button>
+          <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
+        </div>
+      </div>
+      <div class="level-info" id="science-round-label">Round 1</div>
+      <div class="progress-track"><div id="science-progress-fill" class="progress-fill"></div></div>
+      <div class="card">
+        <div id="science-card" class="science-card">
+          <div id="science-emoji" class="science-emoji"></div>
+          <div id="science-theme" class="science-theme"></div>
+          <p id="science-fact" class="science-fact"></p>
+        </div>
+        <div id="science-prompt" class="math-prompt"></div>
+        <div id="science-choices" class="choice-grid"></div>
+        <div id="science-feedback" class="feedback"></div>
+        <div id="science-next-row" class="next-row hidden">
+          <p id="science-enter-hint" class="enter-hint">Press Enter or tap Next</p>
+          <button type="button" class="btn btn-lg btn-next" id="science-next">Next ▶</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEM -->
+    <section id="screen-stem" class="screen" aria-label="Code Path">
+      <div class="panel-header">
+        <h2>🤖 Code Path</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div class="stars-display">⭐ <span class="stars-count">0</span></div>
+          <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
+        </div>
+      </div>
+
+      <ol class="stem-coach" aria-label="How to play">
+        <li><span class="coach-num">①</span> Tap moves below</li>
+        <li><span class="coach-num">②</span> Press big <strong>GO!</strong></li>
+        <li><span class="coach-num">③</span> Watch the robot walk to the ⭐</li>
+      </ol>
+
+      <div id="stem-levels" class="level-pills"></div>
+      <div class="level-info">
+        <strong id="stem-level-label">Level 1</strong> — <span id="stem-tip"></span>
+        <div style="margin-top:6px;opacity:0.9;" id="stem-max">0 of 6 moves in your plan</div>
+        <div id="stem-facing" class="stem-facing" aria-live="polite">Robot is looking RIGHT →</div>
+      </div>
+
+      <div class="stem-layout">
+        <div class="stem-board-col">
+          <div class="grid-wrap">
+            <div id="stem-grid" class="stem-grid" role="img" aria-label="Game grid"></div>
+          </div>
+          <ul class="stem-legend" aria-label="Board key">
+            <li><span class="leg-swatch path"></span> empty = path</li>
+            <li><span class="leg-swatch wall"></span> dark = wall</li>
+            <li><span class="leg-emoji">🤖</span> = you</li>
+            <li><span class="leg-emoji">⭐</span> = goal</li>
+          </ul>
+        </div>
+
+        <div class="card stem-plan-card">
+          <h3 class="stem-moves-title">① Pick a move</h3>
+          <div id="stem-palette" class="cmd-palette"></div>
+          <p id="stem-if-tip" class="stem-if-tip" hidden>💡 <strong>❓ If path is open</strong> means: only do the next move when nothing is blocking the way.</p>
+
+          <h3 class="stem-plan-title">② Your plan</h3>
+          <div id="stem-program" class="program-list" aria-live="polite"></div>
+
+          <div class="stem-controls">
+            <button type="button" class="btn btn-success btn-go" id="stem-run">GO!</button>
+            <button type="button" class="btn btn-sm btn-startover" id="stem-startover">↺ Start over</button>
+          </div>
+          <div id="stem-feedback" class="feedback"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHESS -->
+    <section id="screen-chess" class="screen" aria-label="Chess">
+      <div class="panel-header">
+        <h2 id="chess-title">♟️ Chess</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div class="stars-display">⭐ <span class="stars-count">0</span></div>
+          <button type="button" class="btn btn-speak" id="chess-speak" title="Read aloud" aria-label="Read aloud">🔊</button>
+          <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
+        </div>
+      </div>
+
+      <div id="chess-menu" class="chess-menu">
+        <p class="section-sub">Learn how pieces move, then try a quiz!</p>
+        <div class="hub-grid chess-menu-grid">
+          <div class="hub-card">
+            <button type="button" class="btn btn-xl btn-chess" id="chess-nav-learn">
+              <span class="emoji">📖</span>
+              <span class="label">Learn pieces</span>
+              <span class="hint">Tap a piece · see where it goes</span>
+            </button>
+          </div>
+          <div class="hub-card">
+            <button type="button" class="btn btn-xl btn-secondary" id="chess-nav-identify">
+              <span class="emoji">👀</span>
+              <span class="label">Name the piece</span>
+              <span class="hint">Which piece is this?</span>
+            </button>
+          </div>
+          <div class="hub-card">
+            <button type="button" class="btn btn-xl btn-primary" id="chess-nav-moves">
+              <span class="emoji">🎯</span>
+              <span class="label">How does it move?</span>
+              <span class="hint">Pick the right answer</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="chess-learn" class="hidden">
+        <div id="chess-piece-pills" class="level-pills"></div>
+        <p id="chess-learn-tip" class="level-info"></p>
+        <div class="chess-learn-layout">
+          <div class="chess-board-wrap">
+            <div id="chess-board-learn" class="chess-board" role="grid" aria-label="Chess board"></div>
+          </div>
+          <div class="card chess-info-card">
+            <div id="chess-learn-glyph" class="chess-big-glyph">♔</div>
+            <h3 id="chess-learn-name">King</h3>
+            <p id="chess-learn-how" class="chess-how"></p>
+            <p class="enter-hint">Tap a square to place the piece. Green = where it can go.</p>
+            <div class="stem-controls" style="margin-top:12px;">
+              <button type="button" class="btn btn-sm" id="chess-learn-prev">◀ Prev</button>
+              <button type="button" class="btn btn-sm btn-next" id="chess-learn-next">Next ▶</button>
+              <button type="button" class="btn btn-sm" id="chess-learn-back">Menu</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="chess-quiz" class="hidden">
+        <div class="level-info" id="chess-quiz-label">Quiz</div>
+        <div class="progress-track"><div id="chess-progress-fill" class="progress-fill"></div></div>
+        <div class="card">
+          <div id="chess-quiz-glyph" class="chess-big-glyph">♘</div>
+          <div id="chess-quiz-board-wrap" class="chess-board-wrap hidden">
+            <div id="chess-board-quiz" class="chess-board chess-board-sm" role="grid" aria-label="Quiz board"></div>
+          </div>
+          <div id="chess-quiz-prompt" class="math-prompt"></div>
+          <div id="chess-quiz-choices" class="choice-grid"></div>
+          <div id="chess-feedback" class="feedback"></div>
+          <div id="chess-next-row" class="next-row hidden">
+            <p class="enter-hint">Press Enter or tap Next</p>
+            <button type="button" class="btn btn-lg btn-next" id="chess-next">Next ▶</button>
+          </div>
+          <div style="margin-top:10px;">
+            <button type="button" class="btn btn-sm" id="chess-quiz-back">Menu</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <div class="big-emoji" id="modal-emoji">🎉</div>
+      <h3 id="modal-title">Nice!</h3>
+      <div class="stars-big hidden" id="modal-stars"></div>
+      <p id="modal-body"></p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" class="btn btn-lg btn-primary" id="modal-primary">OK</button>
+        <button type="button" class="btn btn-lg btn-ghost" id="modal-secondary" style="color:#333;border-color:#ccc;background:#f0f0f0;">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/vendor/xlsx.full.min.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/tracker.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/typing.js"></script>
+  <script src="js/math.js"></script>
+  <script src="js/reading.js"></script>
+  <script src="js/spelling.js"></script>
+  <script src="js/science.js"></script>
+  <script src="js/stem.js"></script>
+  <script src="js/chess.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
