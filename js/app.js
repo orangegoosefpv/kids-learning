@@ -1987,6 +1987,9 @@
     if (window.KidsAuth) {
       KidsAuth.onAuthStateChanged(onAuthUser);
       KidsAuth.init();
+      renderAuthChip();
+    } else {
+      renderAuthChip();
     }
 
     $('#nav-typing')?.addEventListener('click', () => { KidsAudio.click(); openTyping(); });
