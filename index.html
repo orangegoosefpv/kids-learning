@@ -70,9 +70,9 @@
         </div>
         <div class="hub-card">
           <button type="button" class="btn btn-xl btn-success" id="nav-stem">
-            <span class="emoji">🤖</span>
-            <span class="label">Code Path</span>
-            <span class="hint">Program a robot · 12 levels</span>
+            <span class="emoji">🐵</span>
+            <span class="label">Monkey Code</span>
+            <span class="hint">Bananas + chest · 12 jungle levels</span>
           </button>
         </div>
         <div class="hub-card">
@@ -269,10 +269,10 @@
       </div>
     </section>
 
-    <!-- STEM -->
-    <section id="screen-stem" class="screen" aria-label="Code Path">
+    <!-- STEM / Monkey Code -->
+    <section id="screen-stem" class="screen" aria-label="Monkey Code">
       <div class="panel-header">
-        <h2>🤖 Code Path</h2>
+        <h2>🐵 Monkey Code</h2>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <div class="stars-display">⭐ <span class="stars-count">0</span></div>
           <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
@@ -281,41 +281,44 @@
 
       <ol class="stem-coach" aria-label="How to play">
         <li><span class="coach-num">①</span> Tap moves below</li>
-        <li><span class="coach-num">②</span> Press big <strong>GO!</strong></li>
-        <li><span class="coach-num">③</span> Watch the robot walk to the ⭐</li>
+        <li><span class="coach-num">②</span> Press big <strong>PLAY</strong></li>
+        <li><span class="coach-num">③</span> Monkey gets all 🍌 then the 🧰 chest</li>
       </ol>
 
       <div id="stem-levels" class="level-pills"></div>
       <div class="level-info">
         <strong id="stem-level-label">Level 1</strong> — <span id="stem-tip"></span>
         <div style="margin-top:6px;opacity:0.9;" id="stem-max">0 of 6 moves in your plan</div>
-        <div id="stem-facing" class="stem-facing" aria-live="polite">Robot is looking RIGHT →</div>
+        <div id="stem-bananas" class="stem-bananas" aria-live="polite">🍌 0 / 0 bananas</div>
+        <div id="stem-facing" class="stem-facing" aria-live="polite">Monkey is looking RIGHT →</div>
       </div>
 
       <div class="stem-layout">
         <div class="stem-board-col">
-          <div class="grid-wrap">
-            <div id="stem-grid" class="stem-grid" role="img" aria-label="Game grid"></div>
+          <div class="grid-wrap stem-jungle-board">
+            <div id="stem-grid" class="stem-grid" role="img" aria-label="Jungle grid"></div>
           </div>
           <ul class="stem-legend" aria-label="Board key">
-            <li><span class="leg-swatch path"></span> empty = path</li>
-            <li><span class="leg-swatch wall"></span> dark = wall</li>
-            <li><span class="leg-emoji">🤖</span> = you</li>
-            <li><span class="leg-emoji">⭐</span> = goal</li>
+            <li><span class="leg-emoji">🐵</span> = monkey</li>
+            <li><span class="leg-emoji">🍌</span> = banana</li>
+            <li><span class="leg-emoji">🧰</span> = chest</li>
+            <li><span class="leg-swatch path"></span> = path</li>
+            <li><span class="leg-swatch wall"></span> = rock / wall</li>
           </ul>
         </div>
 
         <div class="card stem-plan-card">
           <h3 class="stem-moves-title">① Pick a move</h3>
           <div id="stem-palette" class="cmd-palette"></div>
-          <p id="stem-if-tip" class="stem-if-tip" hidden>💡 <strong>❓ If path is open</strong> means: only do the next move when nothing is blocking the way.</p>
+          <p id="stem-if-tip" class="stem-if-tip" hidden>💡 <strong>❓ Only if open</strong> means: only do the next move when nothing is blocking the way.</p>
 
           <h3 class="stem-plan-title">② Your plan</h3>
           <div id="stem-program" class="program-list" aria-live="polite"></div>
 
           <div class="stem-controls">
-            <button type="button" class="btn btn-success btn-go" id="stem-run">GO!</button>
+            <button type="button" class="btn btn-success btn-go" id="stem-run">▶ PLAY</button>
             <button type="button" class="btn btn-sm btn-startover" id="stem-startover">↺ Start over</button>
+            <button type="button" class="btn btn-sm btn-hint" id="stem-hint">💡 Hint</button>
           </div>
           <div id="stem-feedback" class="feedback"></div>
         </div>

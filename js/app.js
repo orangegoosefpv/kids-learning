@@ -136,7 +136,7 @@
       <div class="stat-pill">✏️ Spelling: <span>${(p.spelling && p.spelling.completed) || 0}</span></div>
       <div class="stat-pill">🔬 Science: <span>${(p.science && p.science.completed) || 0}</span></div>
       <div class="stat-pill">🔢 Math best: <span>${p.math[kidGrade()] || 0}</span></div>
-      <div class="stat-pill">🤖 Code Path: <span>${stemDone}/12</span></div>
+      <div class="stat-pill">🐵 Monkey Code: <span>${stemDone}/12</span></div>
       <div class="stat-pill">♟️ Chess: <span>${(p.chess && p.chess.completed) || 0}</span></div>
     `;
     updateTrackerCount();
@@ -922,10 +922,23 @@
     refreshHubStats();
   }
 
-  /* ================= STEM ================= */
+  /* ================= STEM / Monkey Code ================= */
+  function stemCmdMeta() {
+    const grade = kidGrade();
+    if (StemGame.getCmdMeta) return StemGame.getCmdMeta(grade);
+    const by = StemGame.CMD_META_BY_GRADE;
+    if (by && by[grade]) return by[grade];
+    return StemGame.CMD_META || {};
+  }
+
   function openStem() {
     cancelReadAloud();
     showScreen('screen-stem');
+    const screen = $('#screen-stem');
+    if (screen) {
+      screen.classList.remove('grade-prek', 'grade-grade2', 'grade-grade3');
+      screen.classList.add('grade-' + kidGrade());
+    }
     const p = profile();
     const startLv = Math.min(p.stem.level || 0, StemGame.LEVELS.length - 1);
     StemGame.loadLevel(startLv);
@@ -935,7 +948,6 @@
   function stemFacingLabel(st, emoji) {
     const word = (st && st.facingWord) || 'RIGHT';
     const arrow = (st && st.facingArrow) || '→';
-    // Prefer live emoji when animating; map common ones to words
     const byEmoji = {
       '⬆️': { word: 'UP', arrow: '↑' },
       '➡️': { word: 'RIGHT', arrow: '→' },
@@ -945,7 +957,7 @@
     const mapped = emoji && byEmoji[emoji];
     const w = mapped ? mapped.word : word;
     const a = mapped ? mapped.arrow : arrow;
-    return `Robot is looking ${w} ${a}`;
+    return `Monkey is looking ${w} ${a}`;
   }
 
   function updateStemFacing(emoji) {
@@ -962,13 +974,37 @@
     if (el) el.textContent = `${st.program.length} of ${lv.maxCmds} moves in your plan`;
   }
 
+  function updateStemBananas(st) {
+    const el = $('#stem-bananas');
+    if (!el) return;
+    const s = st || StemGame.getState();
+    const got = s.bananasCollected != null ? s.bananasCollected : (s.collected ? s.collected.length : 0);
+    const total = s.bananasTotal != null ? s.bananasTotal : 0;
+    el.textContent = `🍌 ${got} / ${total} bananas`;
+  }
+
+  function maybeSpeakStemTip(lv) {
+    if (!isPrek() || !lv) return;
+    const tip = lv.tip || '';
+    const script = tip
+      ? `Monkey Code. ${lv.title}. ${tip}`
+      : `Monkey Code level ${lv.id}. Tap moves, then press PLAY. Get all bananas, then the chest.`;
+    setReadAloud(script, { auto: true });
+  }
+
   function renderStem() {
     const st = StemGame.getState();
     const lv = st.level;
+    const screen = $('#screen-stem');
+    if (screen) {
+      screen.classList.remove('grade-prek', 'grade-grade2', 'grade-grade3');
+      screen.classList.add('grade-' + kidGrade());
+    }
     $('#stem-level-label').textContent = `Level ${lv.id}: ${lv.title}`;
     $('#stem-tip').textContent = lv.tip;
     updateStemMax();
     updateStemFacing(st.facingEmoji);
+    updateStemBananas(st);
 
     const pills = $('#stem-levels');
     const completed = profile().stem.completed || [];
@@ -984,15 +1020,21 @@
       });
     });
 
+    const metaMap = stemCmdMeta();
     const pal = $('#stem-palette');
     pal.innerHTML = '';
+    const grade = kidGrade();
     lv.allowed.forEach(cmd => {
-      const meta = st.CMD_META[cmd];
+      const meta = metaMap[cmd] || StemGame.CMD_META[cmd];
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'cmd-btn' + (meta.cls ? ' ' + meta.cls : '');
-      b.title = meta.title;
-      b.textContent = meta.label;
+      b.title = meta.title || meta.label;
+      if (grade === 'grade2' && meta.code) {
+        b.innerHTML = `${escapeHtml(meta.label)}<span class="cmd-sub">${escapeHtml(meta.code)}</span>`;
+      } else {
+        b.textContent = meta.label;
+      }
       b.addEventListener('click', () => {
         if (StemGame.addCmd(cmd)) {
           renderStemProgram();
@@ -1007,16 +1049,37 @@
     const ifTip = $('#stem-if-tip');
     if (ifTip) ifTip.hidden = !lv.allowed.includes('IF_CLEAR');
 
+    const fb = $('#stem-feedback');
+    if (fb) { fb.textContent = ''; fb.className = 'feedback'; }
+
     renderStemGrid();
     renderStemProgram();
+    maybeSpeakStemTip(lv);
   }
 
-  function renderStemGrid(highlightRobot, facingEmoji) {
+  function collectedKeySet(st) {
+    const set = {};
+    const list = (st && st.collected) || [];
+    list.forEach(b => { set[b.r + ',' + b.c] = true; });
+    return set;
+  }
+
+  function renderStemGrid(highlightRobot, facingEmoji, stepInfo) {
     const st = StemGame.getState();
     const wrap = $('#stem-grid');
-    wrap.style.gridTemplateColumns = `repeat(${st.cols}, 48px)`;
+    const cellSize = window.matchMedia('(max-width: 520px)').matches ? 40 : 48;
+    wrap.style.gridTemplateColumns = `repeat(${st.cols}, ${cellSize}px)`;
     const robot = highlightRobot || st.robot;
     const face = facingEmoji || (highlightRobot && highlightRobot.facingEmoji) || st.facingEmoji;
+    const collected = stepInfo && stepInfo.collected
+      ? (function () {
+          const set = {};
+          (stepInfo.collected || []).forEach(b => { set[b.r + ',' + b.c] = true; });
+          return set;
+        })()
+      : collectedKeySet(st);
+    const executing = !!(stepInfo && stepInfo.status && stepInfo.status !== 'start');
+
     let html = '';
     for (let r = 0; r < st.rows; r++) {
       for (let c = 0; c < st.cols; c++) {
@@ -1024,9 +1087,16 @@
         let cls = 'cell';
         let content = '';
         if (ch === '#') cls += ' wall';
-        if (ch === 'G') { cls += ' goal'; content = '⭐'; }
-        if (robot.r === r && robot.c === c) {
-          content = `<span class="robot">🤖</span>`;
+        else if (ch === 'T' || ch === 'G') {
+          cls += ' treasure goal';
+          content = '<span class="treasure-emoji">🧰</span>';
+        } else if (ch === 'B') {
+          if (collected[r + ',' + c]) {
+            cls += ' banana-gone';
+          } else {
+            cls += ' banana';
+            content = '<span class="banana-emoji">🍌</span>';
+          }
         }
         html += `<div class="${cls}" data-r="${r}" data-c="${c}">${content}</div>`;
       }
@@ -1034,24 +1104,36 @@
     wrap.innerHTML = html;
     const cell = wrap.querySelector(`[data-r="${robot.r}"][data-c="${robot.c}"]`);
     if (cell) {
-      cell.innerHTML = `<span class="robot" title="${stemFacingLabel(st, face)}">🤖${face || ''}</span>`;
+      const bounce = executing ? ' executing' : '';
+      cell.innerHTML = `<span class="monkey robot${bounce}" title="${stemFacingLabel(st, face)}">🐵${face || ''}</span>`;
     }
     updateStemFacing(face);
+    if (stepInfo) {
+      updateStemBananas({
+        bananasCollected: stepInfo.collected ? stepInfo.collected.length : (st.bananasTotal - (stepInfo.bananasRemaining || 0)),
+        bananasTotal: stepInfo.bananasTotal != null ? stepInfo.bananasTotal : st.bananasTotal
+      });
+    } else {
+      updateStemBananas(st);
+    }
   }
 
   function renderStemProgram(execSrc) {
     const st = StemGame.getState();
     const list = $('#stem-program');
+    const metaMap = stemCmdMeta();
     list.innerHTML = '';
     if (!st.program.length) {
       list.innerHTML = '<p class="program-empty">Your plan is empty — tap a move!</p>';
       return;
     }
+    const grade = kidGrade();
     st.program.forEach((cmd, i) => {
-      const meta = st.CMD_META[cmd];
+      const meta = metaMap[cmd] || StemGame.CMD_META[cmd];
       const chip = document.createElement('div');
       chip.className = 'prog-chip' + (meta.cls ? ' ' + meta.cls : '') + (execSrc === i ? ' executing' : '');
-      chip.innerHTML = `<span class="prog-num">${i + 1}.</span><span class="prog-label">${meta.label}</span><button type="button" aria-label="Remove step ${i + 1}">&times;</button>`;
+      const label = grade === 'grade3' && meta.code ? meta.code : meta.label;
+      chip.innerHTML = `<span class="prog-num">${i + 1}.</span><span class="prog-label">${escapeHtml(label)}</span><button type="button" aria-label="Remove step ${i + 1}">&times;</button>`;
       chip.querySelector('button').addEventListener('click', (e) => {
         e.stopPropagation();
         StemGame.removeCmd(i);
@@ -1062,46 +1144,74 @@
     });
   }
 
+  function stemFailMessage(result) {
+    if (result && result.bumped) {
+      return '🐵 Oof! Monkey bumped a rock. Try a new plan.';
+    }
+    if (result && result.atTreasure && result.bananasLeft > 0) {
+      return `🍌 Almost! ${result.bananasLeft} banana${result.bananasLeft === 1 ? '' : 's'} still out there — then the chest.`;
+    }
+    if (result && result.bananasLeft > 0 && result.missedChest) {
+      return '🍌 Monkey missed some bananas (and the chest). Try again!';
+    }
+    if (result && result.missedChest) {
+      return '🧰 Monkey didn’t reach the treasure chest. Keep trying!';
+    }
+    return 'Oops — try a new plan!';
+  }
+
   async function runStem() {
     const runBtn = $('#stem-run');
     const startBtn = $('#stem-startover');
+    const hintBtn = $('#stem-hint');
     if (StemGame.getState().program.length === 0) {
       const fb = $('#stem-feedback');
-      fb.textContent = 'Tap a move first, then press GO!';
+      fb.textContent = 'Tap a move first, then press PLAY!';
       fb.className = 'feedback bad';
       return;
     }
     runBtn.disabled = true;
     if (startBtn) startBtn.disabled = true;
+    if (hintBtn) hintBtn.disabled = true;
     StemGame.resetRobot();
     renderStemGrid();
     const result = await StemGame.run((step) => {
       renderStemProgram(step.srcIndex);
-      renderStemGrid(step.robot, step.facingEmoji);
+      renderStemGrid(step.robot, step.facingEmoji, step);
     }, 300);
     runBtn.disabled = false;
     if (startBtn) startBtn.disabled = false;
+    if (hintBtn) hintBtn.disabled = false;
     renderStemProgram();
 
     {
       const st0 = StemGame.getState();
-      const title = (st0.level && (st0.level.title || ('Level ' + st0.level.id))) || 'Code Path';
-      trackAnswer('Code Path', title, !!result.won, result.won ? 'goal reached' : 'did not reach goal');
+      const title = (st0.level && (st0.level.title || ('Level ' + st0.level.id))) || 'Monkey Code';
+      let detail = 'did not finish';
+      if (result.won) detail = 'bananas + chest';
+      else if (result.bumped) detail = 'bumped wall';
+      else if (result.atTreasure && result.bananasLeft > 0) detail = 'chest but bananas left';
+      else if (result.bananasLeft > 0) detail = 'missed bananas';
+      else if (result.missedChest) detail = 'missed chest';
+      trackAnswer('Monkey Code', title, !!result.won, detail);
     }
+
     if (result.won) {
       const st = StemGame.getState();
       const p = profile();
       const id = st.level.id;
       if (!p.stem.completed.includes(id)) p.stem.completed.push(id);
       p.stem.level = Math.max(p.stem.level || 0, st.levelIdx + 1);
-      KidsStorage.addStars(state, 2);
+      const stars = StemGame.starsForWin ? StemGame.starsForWin(st.program.length) : 2;
+      KidsStorage.addStars(state, stars);
       confettiBurst();
       const nextIdx = st.levelIdx + 1;
+      const starStr = '⭐'.repeat(stars);
       showModal({
-        emoji: '🎉',
-        title: 'You made it!',
-        body: `Level ${id} complete. +2⭐`,
-        stars: 2,
+        emoji: '🐵',
+        title: 'Bananas caught!',
+        body: `Level ${id} complete. ${starStr} (+${stars})`,
+        stars,
         primary: {
           label: nextIdx < StemGame.LEVELS.length ? 'Next level' : 'You beat them all!',
           fn: () => {
@@ -1114,15 +1224,21 @@
             }
           }
         },
-        secondary: { label: 'Play again', fn: () => { StemGame.clearProgram(); StemGame.resetRobot(); renderStem(); } }
+        secondary: {
+          label: 'Play again',
+          fn: () => { StemGame.clearProgram(); StemGame.resetRobot(); renderStem(); }
+        }
       });
       refreshHubStats();
     } else {
-      $('#stem-feedback').textContent = 'Oops — try a new plan';
+      $('#stem-feedback').textContent = stemFailMessage(result);
       $('#stem-feedback').className = 'feedback bad';
       StemGame.resetRobot();
       renderStemGrid();
-      setTimeout(() => { $('#stem-feedback').textContent = ''; }, 2500);
+      setTimeout(() => {
+        const fb = $('#stem-feedback');
+        if (fb && fb.classList.contains('bad')) { fb.textContent = ''; fb.className = 'feedback'; }
+      }, 3200);
     }
   }
 
@@ -1133,6 +1249,21 @@
     renderStem();
     const fb = $('#stem-feedback');
     if (fb) { fb.textContent = ''; fb.className = 'feedback'; }
+  }
+
+  function hintStem() {
+    const st = StemGame.getState();
+    const lv = st.level || {};
+    const fb = $('#stem-feedback');
+    if (!fb) return;
+    if (lv.hint) {
+      fb.textContent = '💡 ' + lv.hint;
+      fb.className = 'feedback ok';
+      if (isPrek()) setReadAloud(lv.hint, { auto: true });
+    } else {
+      fb.textContent = '💡 Try a shorter plan — collect every 🍌 before the 🧰 chest.';
+      fb.className = 'feedback ok';
+    }
   }
 
 

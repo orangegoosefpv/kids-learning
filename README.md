@@ -23,7 +23,7 @@ Progress is saved in the browser (`localStorage`) per player profile. An optiona
 | **Reading** | Pre-K phonics/letters/CVC · **Joziah (G2):** phonics warm-ups + sight words + chunked passages with **sentence / Hear it / word-tap** assists · G3 passages + comprehension |
 | **Spelling** | Memorize beat, then type the word; **Joziah** uses decodable / high-frequency words; Enter / Next word advances |
 | **Science** | Fun fact cards + light questions (animals, weather, plants, body, magnets) |
-| **Code Path** | Basic robot pathing — 12 levels: ⬆️ forward · ⬅️/➡️ turns · loops (×2/×3) · “if clear”; facing compass on screen |
+| **Monkey Code** | Jungle coding path (CodeMonkey-inspired): 🐵 collect all 🍌 then 🧰 — 12 levels teaching sequencing → turns → loops → conditionals; grade-aware labels; PLAY + stars |
 | **Chess** | Fundamentals only: learn how pieces move on a mini board · quizzes to name pieces and how they move (♔♕♖♗♘♙) |
 | **Excel tracker** | Parent control on Home: download a lightweight `.xlsx` log (Child · Section · Question/Prompt · Result · Timestamp). Optional “Update Excel file…” when the browser supports File System Access |
 
@@ -84,7 +84,7 @@ kids-learning/
   js/reading.js       G2 phonics / chunked passages
   js/spelling.js
   js/science.js
-  js/stem.js          Code Path engine (kept basic)
+  js/stem.js          Monkey Code engine (bananas + chest, grade-aware)
   js/chess.js         Piece lessons + quizzes
   js/app.js           UI glue
 ```
