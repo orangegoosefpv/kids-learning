@@ -589,8 +589,7 @@
     const q = st.question;
     const pct = Math.round((st.round / st.total) * 100);
     $('#reading-progress-fill').style.width = pct + '%';
-    const phaseLabel = q.mode === 'phonics' ? 'Phonics warm-up' : 'Reading';
-    $('#reading-round-label').textContent = `${phaseLabel} · ${st.round + 1} / ${st.total} · Score ${st.score}`;
+    $('#reading-round-label').textContent = `Reading · ${st.round + 1} / ${st.total} · Score ${st.score}`;
     $('#reading-feedback').textContent = '';
     $('#reading-feedback').className = 'feedback';
     $('#reading-next-row')?.classList.add('hidden');
@@ -642,8 +641,12 @@
 
     let readScript = '';
     if (q.mode === 'prek' || q.mode === 'phonics') {
-      if (q.show) readScript += `Look. `;
-      readScript += String(q.prompt || '');
+      if (q.prompt) {
+        if (q.show) readScript += `Look. `;
+        readScript += String(q.prompt);
+      } else if (q.show) {
+        readScript += String(q.show);
+      }
     } else if (q.sentences && q.sentences.length) {
       // Store full passage for header 🔊; grade2 uses Hear-it for one sentence
       readScript += q.sentences.join(' ') + ' ';
@@ -662,7 +665,7 @@
     const res = ReadingGame.check(answer);
     if (!res) return;
     const q = ReadingGame.getState().question;
-    trackAnswer('Reading', (q && q.prompt) || 'Reading', res.ok, 'answer: ' + answer);
+    trackAnswer('Reading', (q && (q.prompt || q.show)) || 'Reading', res.ok, 'answer: ' + answer);
     if (btnEl) {
       btnEl.classList.add(res.ok ? 'correct' : 'wrong');
       if (!res.ok) {

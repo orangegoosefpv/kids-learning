@@ -30,19 +30,19 @@
 
   /* Grade 2 phonics warm-up: sounds → blends → short words (WWC-friendly) */
   const GRADE2_PHONICS = [
-    { kind: 'sound', prompt: 'What sound does S make?', show: '🐍', answer: '/s/', choices: ['/s/', '/m/', '/t/', '/b/'] },
-    { kind: 'sound', prompt: 'What sound does M make?', show: '👄', answer: '/m/', choices: ['/m/', '/n/', '/p/', '/r/'] },
-    { kind: 'blend', prompt: 'Blend: /c/ /a/ /t/ → ?', show: '🐱', answer: 'cat', choices: ['cat', 'cap', 'cut', 'cot'] },
-    { kind: 'blend', prompt: 'Blend: /s/ /u/ /n/ → ?', show: '☀️', answer: 'sun', choices: ['sun', 'sit', 'run', 'sip'] },
-    { kind: 'blend', prompt: 'Blend: /f/ /r/ /o/ /g/ → ?', show: '🐸', answer: 'frog', choices: ['frog', 'flag', 'from', 'fog'] },
-    { kind: 'cvc', prompt: 'Which word matches?', show: '🚢', answer: 'ship', choices: ['ship', 'shop', 'chip', 'sip'] },
-    { kind: 'cvc', prompt: 'Which word matches?', show: '🌳', answer: 'tree', choices: ['tree', 'try', 'trap', 'three'] },
-    { kind: 'sight', prompt: 'Sight word: which one is "the"?', show: '👀', answer: 'the', choices: ['the', 'teh', 'hte', 'tha'] },
-    { kind: 'sight', prompt: 'Sight word: which one is "said"?', show: '💬', answer: 'said', choices: ['said', 'siad', 'sed', 'saed'] },
-    { kind: 'sight', prompt: 'Sight word: which one is "was"?', show: '🕰️', answer: 'was', choices: ['was', 'saw', 'waz', 'wus'] },
-    { kind: 'sight', prompt: 'Sight word: which one is "you"?', show: '👉', answer: 'you', choices: ['you', 'yuo', 'yoo', 'yu'] },
-    { kind: 'sight', prompt: 'Sight word: which one is "come"?', show: '👋', answer: 'come', choices: ['come', 'came', 'cuom', 'coem'] },
-    { kind: 'blend', prompt: 'Blend: /st/ /o/ /p/ → ?', show: '🛑', answer: 'stop', choices: ['stop', 'spot', 'step', 'top'] }
+    { kind: 'sound', prompt: '', show: 'S', answer: '/s/', choices: ['/s/', '/m/', '/t/', '/b/'] },
+    { kind: 'sound', prompt: '', show: 'M', answer: '/m/', choices: ['/m/', '/n/', '/p/', '/r/'] },
+    { kind: 'blend', prompt: '', show: '/c/ /a/ /t/', answer: 'cat', choices: ['cat', 'cap', 'cut', 'cot'] },
+    { kind: 'blend', prompt: '', show: '/s/ /u/ /n/', answer: 'sun', choices: ['sun', 'sit', 'run', 'sip'] },
+    { kind: 'blend', prompt: '', show: '/f/ /r/ /o/ /g/', answer: 'frog', choices: ['frog', 'flag', 'from', 'fog'] },
+    { kind: 'cvc', prompt: '', show: '🚢', answer: 'ship', choices: ['ship', 'shop', 'chip', 'sip'] },
+    { kind: 'cvc', prompt: '', show: '🌳', answer: 'tree', choices: ['tree', 'try', 'trap', 'three'] },
+    { kind: 'sight', prompt: '', show: 'the', answer: 'the', choices: ['the', 'teh', 'hte', 'tha'] },
+    { kind: 'sight', prompt: '', show: 'said', answer: 'said', choices: ['said', 'siad', 'sed', 'saed'] },
+    { kind: 'sight', prompt: '', show: 'was', answer: 'was', choices: ['was', 'saw', 'waz', 'wus'] },
+    { kind: 'sight', prompt: '', show: 'you', answer: 'you', choices: ['you', 'yuo', 'yoo', 'yu'] },
+    { kind: 'sight', prompt: '', show: 'come', answer: 'come', choices: ['come', 'came', 'cuom', 'coem'] },
+    { kind: 'blend', prompt: '', show: '/st/ /o/ /p/', answer: 'stop', choices: ['stop', 'spot', 'step', 'top'] }
   ];
 
   /* Grade 2 passages: short sentences, emoji cue, chunked lines, simple vocab */
@@ -229,7 +229,6 @@
         choices: cachedChoices,
         answer: item.answer,
         kind: item.kind || 'phonics',
-        tip: 'Sound it out!'
       };
     }
     const q = item.questions[qIdx];
