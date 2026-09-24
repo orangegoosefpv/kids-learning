@@ -1,6 +1,6 @@
 # Kids Learning Lab
 
-A colorful, offline-friendly learning app for three kids with fixed grade profiles:
+A colorful, offline-friendly learning app. **Guest mode** (default, no login) uses three fixed-grade profiles:
 
 | Player | Grade (locked) |
 |--------|----------------|
@@ -11,6 +11,8 @@ A colorful, offline-friendly learning app for three kids with fixed grade profil
 Once a player is selected, **every subject** uses that child’s grade only — no grade pickers after profile select.
 
 Progress is saved in the browser (`localStorage`) per player profile. An optional **Excel answer tracker** logs correct vs incorrect answers for parents.
+
+**Optional Google sign-in** lets a parent manage a household of kids (up to 8) with progress synced via Firebase. The app never requires login — Home always works in guest mode.
 
 ## What’s included
 
@@ -27,7 +29,7 @@ Progress is saved in the browser (`localStorage`) per player profile. An optiona
 | **Chess** | Fundamentals only: learn how pieces move on a mini board · quizzes to name pieces and how they move (♔♕♖♗♘♙) |
 | **Excel tracker** | Parent control on Home: download a lightweight `.xlsx` log (Child · Section · Question/Prompt · Result · Timestamp). Optional “Update Excel file…” when the browser supports File System Access |
 
-No CDNs, no external images/fonts/audio. Soft beeps use the Web Audio API. SheetJS is vendored at `js/vendor/xlsx.full.min.js`.
+No required CDNs for guest mode. Soft beeps use the Web Audio API. SheetJS is vendored at `js/vendor/xlsx.full.min.js`. Optional Firebase compat scripts (Auth + Firestore) are included for Google household cloud save; they no-op until `js/firebase-config.js` has `enabled: true` and real project keys. No external images/fonts/audio otherwise.
 
 ## Open on Windows (simple)
 
@@ -75,7 +77,9 @@ kids-learning/
   index.html          Entry point
   README.md
   css/styles.css
-  js/storage.js       localStorage profiles + grade lock + answer log
+  js/firebase-config.js  Optional Firebase web config (enabled: false by default)
+  js/auth.js          Google Auth + Firestore household sync (no-op if disabled)
+  js/storage.js       localStorage profiles + grade lock + answer log (+ household helpers)
   js/tracker.js       Excel workbook builder (SheetJS) + optional file link
   js/vendor/xlsx.full.min.js
   js/audio.js         Web Audio SFX + Web Speech
@@ -91,7 +95,8 @@ kids-learning/
 
 ## Parent tips
 
-- Edit player **names** with **✏️ Names** on the home screen (grades stay fixed). Misspellings **Joiah** / **Josiah** migrate to **Joziah**.
+- **Guest:** edit player **names** with **✏️ Names** on the home screen (grades stay fixed). Misspellings **Joiah** / **Josiah** migrate to **Joziah**.
+- **Signed in:** use **👨‍👩‍👧‍👦 Manage** / **Manage kids** to add, edit, or remove kids (name, avatar, grade). Guest local data is not wiped on sign-out.
 - Toggle **🔊 Sound** if headphones aren’t on.
 - After answers, kids can press **Enter** or tap the big **Next ▶** button — never stuck.
 - Big **🏠 Home** on every activity screen.
@@ -101,6 +106,59 @@ kids-learning/
 - Stars and progress survive refresh (same browser/profile).
 - Old “Player 1/2/3” saves migrate to Zion/Joziah/Zachariah and keep stars when possible.
 
+
+
+## Optional: Google sign-in & household cloud save
+
+Guest mode is the default and needs **no** Firebase project. Kids keep using Zion / Joziah / Zachariah with `localStorage`.
+
+When you want progress to follow a parent’s Google account across devices:
+
+1. Create a project at [Firebase Console](https://console.firebase.google.com/).
+2. Add a **Web** app; copy the firebaseConfig values.
+3. **Authentication → Sign-in method → Google** → Enable.
+4. **Authentication → Settings → Authorized domains** — add:
+   - `orangegoosefpv.github.io`
+   - `localhost`
+5. **Firestore Database → Create database** (production mode is fine with the rules below).
+6. Paste the web config into `js/firebase-config.js` and set `enabled: true`:
+
+```js
+window.KidsFirebaseConfig = {
+  enabled: true,
+  apiKey: '…',
+  authDomain: '….firebaseapp.com',
+  projectId: '…',
+  storageBucket: '….appspot.com',
+  messagingSenderId: '…',
+  appId: '…'
+};
+```
+
+7. **Firestore → Rules** (only the signed-in owner can read/write their household):
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /households/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+### Behavior
+
+| Mode | Profiles | Progress storage |
+|------|----------|------------------|
+| Guest (no login) | 3 fixed grades; edit names only | `localStorage` key `kidsLearningLab_v1` + answer log key |
+| Signed in | Up to 8 kids; Manage kids CRUD | Firestore `households/{uid}` + local cache `kidsLearningLab_cloud_{uid}` |
+
+- Home is **never** blocked behind auth.
+- First successful sign-in with an empty cloud household **seeds** from the current guest profiles (one-time migrate).
+- Sign-out returns to the guest snapshot; guest data is **not** deleted.
+- Saves are debounced (~800ms) while signed in.
 
 ## Feedback pedagogy (educator review)
 
@@ -116,5 +174,5 @@ kids-learning/
 - Typing/spelling use a text input (best with a physical keyboard).
 - Web Audio may stay silent until the first tap/click (browser autoplay policy).
 - Fullscreen API may require a user gesture; some embedded WebViews block it.
-- Progress is per-browser; clearing site data resets stars and the answer log.
+- Guest progress is per-browser; clearing site data resets stars and the answer log. Signed-in households sync via Firestore (still keep a local cache).
 - Chess is fundamentals only (no full games).

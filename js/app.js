@@ -4,10 +4,20 @@
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
   let state = KidsStorage.load();
+  let householdDraft = null; // working copy inside Manage kids modal
+  let guestSnapshot = null;  // preserved while signed in (sign-out restores guest)
+
+  KidsStorage.bindState(function () { return state; });
 
   function profile() { return KidsStorage.getProfile(state); }
   function kidGrade() { return KidsStorage.getGrade(state); }
-  function persist() { KidsStorage.save(state); }
+
+  function persist() {
+    KidsStorage.save(state);
+    if (window.KidsAuth && KidsAuth.isSignedIn && KidsAuth.isSignedIn() && KidsStorage.isHousehold(state)) {
+      KidsAuth.scheduleSave(state);
+    }
+  }
 
   function trackAnswer(section, prompt, correct, detail) {
     const child = profile().name || 'Unknown';
@@ -18,6 +28,7 @@
       correct: !!correct,
       detail: detail || ''
     });
+    if (KidsStorage.isHousehold(state)) persist();
     updateTrackerCount();
     // Quiet rewrite of linked Excel when File System Access is available
     if (window.KidsTracker && KidsTracker.updateLinkedFileQuiet) {
@@ -95,6 +106,10 @@
   function renderProfiles() {
     const row = $('#profile-row');
     if (!row) return;
+    const signedIn = !!(window.KidsAuth && KidsAuth.isSignedIn && KidsAuth.isSignedIn() && KidsStorage.isHousehold(state));
+    const manageBtn = signedIn
+      ? `<button type="button" class="profile-edit" id="btn-edit-name" title="Manage kids">👨‍👩‍👧‍👦 Manage</button>`
+      : `<button type="button" class="profile-edit" id="btn-edit-name" title="Edit names">✏️ Names</button>`;
     row.innerHTML = state.profiles.map((p, i) => `
       <button type="button" class="profile-chip ${i === state.activeProfile ? 'active' : ''}" data-profile="${i}">
         <span class="avatar">${p.avatar}</span>
@@ -103,7 +118,7 @@
           <span class="grade-badge">${escapeHtml(KidsStorage.gradeLabel(p.grade))}</span>
         </span>
       </button>
-    `).join('') + `<button type="button" class="profile-edit" id="btn-edit-name" title="Edit names">✏️ Names</button>`;
+    `).join('') + manageBtn;
 
     $$('.profile-chip', row).forEach(btn => {
       btn.addEventListener('click', () => {
@@ -115,7 +130,12 @@
       });
     });
     const edit = $('#btn-edit-name');
-    if (edit) edit.addEventListener('click', openNameEditor);
+    if (edit) {
+      edit.addEventListener('click', () => {
+        if (signedIn) openHouseholdManager();
+        else openNameEditor();
+      });
+    }
   }
 
   function escapeHtml(s) {
@@ -247,6 +267,266 @@
       KidsAudio.star();
     };
     btnS.onclick = () => overlay.classList.remove('show');
+  }
+
+  /* ================= AUTH / HOUSEHOLD ================= */
+
+  function truncateEmail(email) {
+    const s = String(email || '');
+    if (s.length <= 22) return s;
+    const at = s.indexOf('@');
+    if (at > 0) {
+      const local = s.slice(0, at);
+      const domain = s.slice(at);
+      const shortLocal = local.length > 10 ? local.slice(0, 8) + '…' : local;
+      return (shortLocal + domain).slice(0, 28);
+    }
+    return s.slice(0, 20) + '…';
+  }
+
+  function renderAuthChip() {
+    const pending = $('#btn-cloud-pending');
+    const signIn = $('#btn-google-signin');
+    const signed = $('#auth-signed-in');
+    const photo = $('#auth-photo');
+    const initial = $('#auth-initial');
+    const emailEl = $('#auth-email');
+    const enabled = !!(window.KidsAuth && KidsAuth.isEnabled && KidsAuth.isEnabled());
+    const user = window.KidsAuth && KidsAuth.getUser ? KidsAuth.getUser() : null;
+
+    if (pending) pending.hidden = enabled;
+    if (signIn) signIn.hidden = !enabled || !!user;
+    if (signed) signed.hidden = !enabled || !user;
+
+    if (user && signed) {
+      const em = user.email || user.displayName || 'Signed in';
+      if (emailEl) {
+        emailEl.textContent = truncateEmail(em);
+        emailEl.title = em;
+      }
+      if (user.photoURL && photo) {
+        photo.src = user.photoURL;
+        photo.hidden = false;
+        if (initial) initial.hidden = true;
+      } else {
+        if (photo) photo.hidden = true;
+        if (initial) {
+          initial.hidden = false;
+          initial.textContent = (user.displayName || user.email || 'P').charAt(0).toUpperCase();
+        }
+      }
+    }
+  }
+
+  function applyState(next, { persistNow = true } = {}) {
+    state = next;
+    KidsStorage.clampActiveProfile(state);
+    if (persistNow) persist();
+    updateChrome();
+    refreshHubStats();
+    renderAuthChip();
+  }
+
+  async function onAuthUser(user) {
+    renderAuthChip();
+    if (!window.KidsAuth || !KidsAuth.isEnabled()) return;
+
+    if (!user) {
+      // Sign-out → restore guest snapshot / guest localStorage (never wipe guest)
+      if (KidsStorage.isHousehold(state)) {
+        const guest = guestSnapshot || KidsStorage.loadGuest();
+        guestSnapshot = null;
+        applyState(guest, { persistNow: false });
+        // Ensure guest key still intact; do not overwrite with household
+        KidsStorage.save(guest);
+      } else {
+        renderAuthChip();
+      }
+      return;
+    }
+
+    // Keep a guest snapshot so sign-out can return without wiping guest data
+    if (!KidsStorage.isHousehold(state)) {
+      guestSnapshot = KidsStorage.loadGuest();
+    }
+
+    try {
+      const household = await KidsAuth.adoptHouseholdAfterLogin(user);
+      if (household) {
+        applyState(household, { persistNow: true });
+      }
+    } catch (e) {
+      console.warn('[KidsAuth] adopt household failed', e);
+      const cached = KidsStorage.loadCloudCache(user.uid);
+      if (cached) applyState(cached, { persistNow: true });
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    KidsAudio.click();
+    if (!KidsAuth.isEnabled()) {
+      openCloudHelp();
+      return;
+    }
+    const btn = $('#btn-google-signin');
+    if (btn) btn.disabled = true;
+    try {
+      const r = await KidsAuth.signInWithGoogle();
+      if (!r.ok && !r.redirect && !r.cancelled) {
+        showModal({
+          emoji: '☁️',
+          title: 'Sign-in needed a nudge',
+          body: r.error || 'Could not sign in with Google. Try again, or continue as guest.',
+          primary: { label: 'OK' }
+        });
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function handleSignOut() {
+    KidsAudio.click();
+    if (window.KidsAuth && KidsAuth.flushSave) KidsAuth.flushSave();
+    await KidsAuth.signOut();
+    // onAuthUser(null) restores guest
+  }
+
+  function openCloudHelp() {
+    const overlay = $('#modal-cloud-help');
+    if (overlay) overlay.classList.add('show');
+  }
+
+  function closeCloudHelp() {
+    const overlay = $('#modal-cloud-help');
+    if (overlay) overlay.classList.remove('show');
+  }
+
+  function openHouseholdManager() {
+    if (!KidsStorage.isHousehold(state)) {
+      openNameEditor();
+      return;
+    }
+    householdDraft = {
+      profiles: state.profiles.map(p => KidsStorage.normalizeProfile(p))
+    };
+    renderHouseholdList();
+    const overlay = $('#modal-household');
+    if (overlay) overlay.classList.add('show');
+  }
+
+  function closeHouseholdManager() {
+    householdDraft = null;
+    const overlay = $('#modal-household');
+    if (overlay) overlay.classList.remove('show');
+  }
+
+  function renderHouseholdList() {
+    const list = $('#household-list');
+    const countEl = $('#household-count');
+    const addBtn = $('#btn-add-kid');
+    if (!list || !householdDraft) return;
+    const avatars = KidsStorage.AVATAR_CHOICES || [];
+    list.innerHTML = householdDraft.profiles.map((p, i) => {
+      const picks = avatars.map(a =>
+        `<button type="button" class="avatar-pick ${a === p.avatar ? 'selected' : ''}" data-i="${i}" data-avatar="${a}" title="${a}">${a}</button>`
+      ).join('');
+      return `<div class="household-kid" data-i="${i}">
+        <div class="avatar-picker" aria-label="Avatar">${picks}</div>
+        <div class="household-kid-fields">
+          <input type="text" maxlength="16" data-field="name" data-i="${i}" value="${escapeHtml(p.name)}" placeholder="Name" aria-label="Kid name" />
+          <select data-field="grade" data-i="${i}" aria-label="Grade">
+            <option value="prek" ${p.grade === 'prek' ? 'selected' : ''}>Pre-K</option>
+            <option value="grade2" ${p.grade === 'grade2' ? 'selected' : ''}>Grade 2</option>
+            <option value="grade3" ${p.grade === 'grade3' ? 'selected' : ''}>Grade 3</option>
+          </select>
+        </div>
+        <button type="button" class="btn-remove-kid" data-remove="${i}" ${householdDraft.profiles.length <= 1 ? 'disabled' : ''}>Remove</button>
+      </div>`;
+    }).join('');
+
+    if (countEl) {
+      countEl.textContent = `${householdDraft.profiles.length} / ${KidsStorage.MAX_KIDS} kids`;
+    }
+    if (addBtn) {
+      addBtn.disabled = householdDraft.profiles.length >= KidsStorage.MAX_KIDS;
+    }
+
+    $$('.avatar-pick', list).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.i);
+        householdDraft.profiles[i].avatar = btn.dataset.avatar;
+        renderHouseholdList();
+      });
+    });
+    $$('input[data-field="name"]', list).forEach(inp => {
+      inp.addEventListener('input', () => {
+        const i = Number(inp.dataset.i);
+        householdDraft.profiles[i].name = inp.value;
+      });
+    });
+    $$('select[data-field="grade"]', list).forEach(sel => {
+      sel.addEventListener('change', () => {
+        const i = Number(sel.dataset.i);
+        householdDraft.profiles[i].grade = sel.value;
+      });
+    });
+    $$('[data-remove]', list).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.remove);
+        const kid = householdDraft.profiles[i];
+        if (householdDraft.profiles.length <= 1) return;
+        if (KidsStorage.kidHasProgress(kid)) {
+          const ok = confirm(`Remove ${kid.name || 'this kid'}? They have stars or progress that will be lost from this household.`);
+          if (!ok) return;
+        }
+        householdDraft.profiles.splice(i, 1);
+        renderHouseholdList();
+      });
+    });
+  }
+
+  function addKidToDraft() {
+    if (!householdDraft) return;
+    if (householdDraft.profiles.length >= KidsStorage.MAX_KIDS) return;
+    const n = householdDraft.profiles.length + 1;
+    const avatars = KidsStorage.AVATAR_CHOICES || ['🦊'];
+    householdDraft.profiles.push(KidsStorage.makeBlankKid({
+      name: 'Kid ' + n,
+      avatar: avatars[n % avatars.length],
+      grade: 'prek'
+    }));
+    renderHouseholdList();
+  }
+
+  function saveHouseholdManager() {
+    if (!householdDraft) return;
+    // Pull latest name values from inputs
+    const list = $('#household-list');
+    if (list) {
+      $$('input[data-field="name"]', list).forEach(inp => {
+        const i = Number(inp.dataset.i);
+        if (householdDraft.profiles[i]) {
+          const v = inp.value.trim() || ('Kid ' + (i + 1));
+          householdDraft.profiles[i].name = KidsStorage.canonicalChildName(v).slice(0, 16);
+        }
+      });
+      $$('select[data-field="grade"]', list).forEach(sel => {
+        const i = Number(sel.dataset.i);
+        if (householdDraft.profiles[i]) householdDraft.profiles[i].grade = sel.value;
+      });
+    }
+    if (!householdDraft.profiles.length) {
+      alert('Keep at least one kid.');
+      return;
+    }
+    state.profiles = householdDraft.profiles.map(p => KidsStorage.normalizeProfile(p));
+    KidsStorage.clampActiveProfile(state);
+    persist();
+    closeHouseholdManager();
+    updateChrome();
+    refreshHubStats();
+    KidsAudio.star();
   }
 
   function toggleFullscreen() {
@@ -1685,14 +1965,29 @@
 
   /* ---- Wire UI ---- */
   function init() {
-    // Persist migrated defaults once
+    // Persist migrated defaults once (guest key only)
     persist();
     updateChrome();
     refreshHubStats();
     showScreen('screen-home');
+    renderAuthChip();
 
     $('#btn-fullscreen')?.addEventListener('click', toggleFullscreen);
     $('#btn-sound')?.addEventListener('click', toggleSound);
+
+    $('#btn-cloud-pending')?.addEventListener('click', () => { KidsAudio.click(); openCloudHelp(); });
+    $('#cloud-help-ok')?.addEventListener('click', () => { KidsAudio.click(); closeCloudHelp(); });
+    $('#btn-google-signin')?.addEventListener('click', handleGoogleSignIn);
+    $('#btn-signout')?.addEventListener('click', handleSignOut);
+    $('#btn-manage-kids')?.addEventListener('click', () => { KidsAudio.click(); openHouseholdManager(); });
+    $('#btn-add-kid')?.addEventListener('click', () => { KidsAudio.click(); addKidToDraft(); });
+    $('#household-save')?.addEventListener('click', () => { KidsAudio.click(); saveHouseholdManager(); });
+    $('#household-cancel')?.addEventListener('click', () => { KidsAudio.click(); closeHouseholdManager(); });
+
+    if (window.KidsAuth) {
+      KidsAuth.onAuthStateChanged(onAuthUser);
+      KidsAuth.init();
+    }
 
     $('#nav-typing')?.addEventListener('click', () => { KidsAudio.click(); openTyping(); });
     $('#nav-math')?.addEventListener('click', () => { KidsAudio.click(); openMath(); });

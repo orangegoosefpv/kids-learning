@@ -22,6 +22,19 @@
         </div>
       </div>
       <div class="top-actions">
+        <div id="auth-chip" class="auth-chip" aria-live="polite">
+          <button type="button" class="btn btn-sm btn-ghost auth-setup-pending" id="btn-cloud-pending" title="Cloud save setup" hidden>☁️ Cloud save (setup pending)</button>
+          <button type="button" class="btn btn-sm btn-google" id="btn-google-signin" title="Sign in with Google" hidden>
+            <span class="google-g" aria-hidden="true">G</span> Sign in with Google
+          </button>
+          <div id="auth-signed-in" class="auth-signed-in" hidden>
+            <img id="auth-photo" class="auth-photo" alt="" width="28" height="28" hidden />
+            <span id="auth-initial" class="auth-initial" hidden>P</span>
+            <span id="auth-email" class="auth-email" title=""></span>
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-manage-kids" title="Manage kids">👨‍👩‍👧‍👦 Manage kids</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-signout" title="Sign out">Sign out</button>
+          </div>
+        </div>
         <button type="button" class="btn btn-sm btn-ghost" id="btn-sound" title="Sound on/off">🔊 Sound</button>
         <button type="button" class="btn btn-sm btn-ghost" id="btn-fullscreen" title="Fullscreen">⛶ Fullscreen</button>
         <div class="stars-display" title="Total stars">⭐ <span class="stars-count">0</span></div>
@@ -423,6 +436,49 @@
     </div>
   </div>
 
+  <!-- Household / Manage kids -->
+  <div id="modal-household" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="household-title">
+    <div class="modal modal-wide">
+      <div class="big-emoji">👨‍👩‍👧‍👦</div>
+      <h3 id="household-title">Manage kids</h3>
+      <p class="household-hint">Add up to 8 kids. Progress syncs to your Google account when signed in.</p>
+      <div id="household-list" class="household-list"></div>
+      <div class="household-actions">
+        <button type="button" class="btn btn-sm btn-secondary" id="btn-add-kid">➕ Add kid</button>
+        <span id="household-count" class="household-count"></span>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;">
+        <button type="button" class="btn btn-lg btn-primary" id="household-save">Save</button>
+        <button type="button" class="btn btn-lg btn-ghost" id="household-cancel" style="color:#333;border-color:#ccc;background:#f0f0f0;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cloud setup help -->
+  <div id="modal-cloud-help" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cloud-help-title">
+    <div class="modal">
+      <div class="big-emoji">☁️</div>
+      <h3 id="cloud-help-title">Cloud save (setup pending)</h3>
+      <p id="cloud-help-body" style="text-align:left;line-height:1.45;">
+        Google sign-in is optional. The lab works fully in <strong>guest mode</strong> with Zion, Joziah, and Zachariah saved in this browser.
+        <br /><br />
+        To enable household cloud save across devices, a parent sets up Firebase (Google Auth + Firestore) and pastes the web config into
+        <code>js/firebase-config.js</code> with <code>enabled: true</code>. See the README section
+        <em>“Optional: Google sign-in &amp; household cloud save”</em>.
+        <br /><br />
+        Authorized domains: <code>orangegoosefpv.github.io</code> and <code>localhost</code>.
+      </p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" class="btn btn-lg btn-primary" id="cloud-help-ok">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/vendor/xlsx.full.min.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/tracker.js"></script>
