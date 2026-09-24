@@ -54,7 +54,7 @@
       // Short delay so UI paints; voices may load async
       speakTimer = setTimeout(() => {
         speakTimer = null;
-        KidsAudio.speak && KidsAudio.speak(lastSpeakScript);
+        KidsAudio.speak && KidsAudio.speak(lastSpeakScript, { mode: 'sentence' });
       }, 280);
     }
   }
@@ -62,7 +62,7 @@
   function replayReadAloud() {
     if (!lastSpeakScript) return;
     cancelReadAloud();
-    KidsAudio.speak && KidsAudio.speak(lastSpeakScript);
+    KidsAudio.speak && KidsAudio.speak(lastSpeakScript, { mode: 'sentence' });
   }
 
   function choicesPhrase(list) {
@@ -139,7 +139,41 @@
       <div class="stat-pill">🐵 Monkey Code: <span>${stemDone}/12</span></div>
       <div class="stat-pill">♟️ Chess: <span>${(p.chess && p.chess.completed) || 0}</span></div>
     `;
+    renderJourneyMap(p);
     updateTrackerCount();
+  }
+
+  function renderJourneyMap(p) {
+    const el = $('#journey-map');
+    if (!el || !p) return;
+    const completed = p.stem.completed || [];
+    const level = p.stem.level || 0;
+    const dots = [];
+    for (let i = 1; i <= 12; i++) {
+      const done = completed.includes(i);
+      const current = !done && (i - 1) === level;
+      dots.push(`<span class="journey-dot${done ? ' done' : ''}${current ? ' current' : ''}" title="Level ${i}${done ? ' done' : ''}">${done ? '✓' : i}</span>`);
+    }
+    const subjects = [
+      { key: 'typing', emoji: '⌨️', label: 'Typing', count: (p.typing && p.typing.completed) || 0 },
+      { key: 'reading', emoji: '📖', label: 'Reading', count: (p.reading && p.reading.completed) || 0 },
+      { key: 'spelling', emoji: '✏️', label: 'Spelling', count: (p.spelling && p.spelling.completed) || 0 },
+      { key: 'math', emoji: '🔢', label: 'Math', count: p.math[kidGrade()] || 0 },
+      { key: 'science', emoji: '🔬', label: 'Science', count: (p.science && p.science.completed) || 0 },
+      { key: 'chess', emoji: '♟️', label: 'Chess', count: (p.chess && p.chess.completed) || 0 }
+    ];
+    const subjHtml = subjects.map(s => {
+      const met = s.count >= 1;
+      return `<span class="journey-subj${met ? ' met' : ''}">${met ? '<span class="j-check">✓</span>' : '<span class="j-check" style="opacity:0.35">○</span>'} ${s.emoji} ${s.label} <span class="j-count">${s.count}</span></span>`;
+    }).join('');
+    el.innerHTML = `
+      <h3>🗺️ My learning journey · ${escapeHtml(p.name)}</h3>
+      <div class="journey-stem">
+        <div class="journey-stem-label">🐵 Monkey Code path · ${completed.length}/12 levels</div>
+        <div class="journey-dots" role="img" aria-label="${completed.length} of 12 Monkey Code levels complete">${dots.join('')}</div>
+      </div>
+      <div class="journey-subjects">${subjHtml}</div>
+    `;
   }
 
   function confettiBurst() {
@@ -385,6 +419,8 @@
     $('#math-round-label').textContent = `Round ${st.round + 1} / ${st.total} · Score ${st.score} · ${KidsStorage.gradeLabel(kidGrade())}`;
     $('#math-feedback').textContent = '';
     $('#math-feedback').className = 'feedback';
+    const teachEl = $('#math-teach');
+    if (teachEl) { teachEl.classList.add('hidden'); teachEl.innerHTML = ''; }
     $('#math-next-row')?.classList.add('hidden');
 
     const prompt = $('#math-prompt');
@@ -443,6 +479,26 @@
     setReadAloud(mathScript);
   }
 
+  function showMathTeach(prob, correct) {
+    const el = $('#math-teach');
+    if (!el) return;
+    const vis = (MathCourse.visualFor || (typeof MathGame !== 'undefined' && MathGame.visualFor))
+      ? (MathCourse.visualFor || MathGame.visualFor)(prob, correct)
+      : null;
+    if (!vis) {
+      el.classList.add('hidden');
+      el.innerHTML = '';
+      return;
+    }
+    el.classList.remove('hidden');
+    el.innerHTML = `
+      <div class="math-teach-title">${escapeHtml(vis.title || 'See why')}</div>
+      <div class="math-teach-visual">${vis.html || ''}</div>
+      ${vis.hint ? `<div class="math-teach-hint">${escapeHtml(vis.hint)}</div>` : ''}
+      <div class="math-teach-answer">Answer: ${escapeHtml(String(correct))}</div>
+    `;
+  }
+
   function submitMath(answer, btnEl) {
     const res = MathCourse.check(answer);
     if (!res) return;
@@ -456,13 +512,22 @@
         });
       }
     }
-    $('#math-feedback').textContent = res.ok ? '⭐ Yes!' : `Almost — answer is ${res.correct}`;
-    $('#math-feedback').className = 'feedback ' + (res.ok ? 'ok' : 'bad');
+    if (res.ok) {
+      $('#math-feedback').textContent = '⭐ Yes!';
+      $('#math-feedback').className = 'feedback ok';
+      const teachEl = $('#math-teach');
+      if (teachEl) { teachEl.classList.add('hidden'); teachEl.innerHTML = ''; }
+    } else {
+      $('#math-feedback').textContent = 'Let\'s see how it works';
+      $('#math-feedback').className = 'feedback bad';
+      showMathTeach(prob, res.correct);
+    }
 
     mathAwaitEnter = true;
     $('#math-next-row')?.classList.remove('hidden');
     if (mathAdvanceTimer) clearTimeout(mathAdvanceTimer);
-    mathAdvanceTimer = setTimeout(() => advanceMath(), res.ok ? 650 : 1100);
+    // Longer pause when showing visual teach so kids can look
+    mathAdvanceTimer = setTimeout(() => advanceMath(), res.ok ? 650 : 2200);
   }
 
   function advanceMath() {
@@ -555,7 +620,7 @@
       const speakWord = (e) => {
         e.stopPropagation();
         const w = el.dataset.word || el.textContent;
-        KidsAudio.speak && KidsAudio.speak(w);
+        KidsAudio.speak && KidsAudio.speak(w, { mode: 'word' });
       };
       el.addEventListener('click', speakWord);
       el.addEventListener('keydown', (e) => {
@@ -570,7 +635,7 @@
       return;
     }
     const s = readingSentences[readingSentenceIdx] || readingSentences[0];
-    KidsAudio.speak && KidsAudio.speak(s);
+    KidsAudio.speak && KidsAudio.speak(s, { mode: 'sentence' });
   }
 
   function shiftReadingSentence(delta) {
@@ -740,18 +805,36 @@
 
     if (st.awaitEnter) {
       wordEl.textContent = st.word;
-      wordEl.classList.remove('hidden-word');
+      wordEl.classList.remove('hidden-word', 'model-word');
       scramEl.textContent = '';
       input.readOnly = true;
       input.disabled = false;
       input.blur();
+      $('#screen-spelling')?.classList.remove('spelling-correcting');
       $('#spelling-next-row')?.classList.remove('hidden');
+      return;
+    }
+
+    if (st.correcting) {
+      // Should not normally hit via renderSpelling start, but keep scaffold ready
+      wordEl.textContent = st.word;
+      wordEl.classList.remove('hidden-word');
+      wordEl.classList.add('model-word');
+      scramEl.textContent = 'Model — type it the right way';
+      $('#spelling-hint').textContent = 'Try again — type it the right way!';
+      input.value = '';
+      input.disabled = false;
+      input.readOnly = false;
+      input.focus();
+      $('#screen-spelling')?.classList.add('spelling-correcting');
+      $('#spelling-next-row')?.classList.add('hidden');
       return;
     }
 
     // Memorize beat: show word briefly, then hide / show scramble
     wordEl.textContent = st.word;
-    wordEl.classList.remove('hidden-word');
+    wordEl.classList.remove('hidden-word', 'model-word');
+    $('#screen-spelling')?.classList.remove('spelling-correcting');
     scramEl.textContent = '';
     $('#spelling-hint').textContent = 'Look carefully… then type it!';
     input.disabled = true;
@@ -776,7 +859,7 @@
       KidsAudio.setSpoken && KidsAudio.setSpoken(lastSpeakScript);
       if (isPrek()) {
         KidsAudio.cancelSpeak && KidsAudio.cancelSpeak();
-        KidsAudio.speak && KidsAudio.speak('Now type the word.');
+        KidsAudio.speak && KidsAudio.speak('Now type the word.', { mode: 'phrase' });
       }
     }, kidGrade() === 'prek' ? 3200 : 1800);
   }
@@ -787,29 +870,66 @@
       advanceSpelling();
       return;
     }
-    if (st.phase !== 'typing' && st.phase !== 'hide' && st.phase !== 'show') return;
+    if (st.phase !== 'typing' && st.phase !== 'hide' && st.phase !== 'show' && st.phase !== 'correcting') return;
     const input = $('#spelling-input');
-    const res = SpellingGame.check(input.value);
+    const typed = input.value;
+    const res = SpellingGame.check(typed);
     if (!res) return;
-    trackAnswer('Spelling', 'Spell: ' + (res.correct || st.word), res.ok, 'typed: ' + input.value);
-    // readOnly so document Enter still works for Next
+
+    const wordEl = $('#spelling-word');
+
+    if (res.correcting && res.stillCorrecting && !res.ok) {
+      // First miss OR still wrong during correction — show model, clear, require re-type
+      const wasAlreadyCorrecting = st.phase === 'correcting';
+      // Only log the initial miss once as incorrect (not every failed retype)
+      if (!wasAlreadyCorrecting) {
+        trackAnswer('Spelling', 'Spell: ' + (res.correct || st.word), false, 'typed: ' + typed + ' · miss → correcting');
+      }
+      wordEl.textContent = res.correct;
+      wordEl.classList.remove('hidden-word');
+      wordEl.classList.add('model-word');
+      $('#spelling-scramble').textContent = 'Keep this model while you type';
+      $('#spelling-feedback').textContent = 'Try again — type it the right way!';
+      $('#spelling-feedback').className = 'feedback bad';
+      $('#spelling-hint').textContent = 'Type the correct spelling, then press Enter';
+      input.value = '';
+      input.readOnly = false;
+      input.disabled = false;
+      input.focus();
+      $('#screen-spelling')?.classList.add('spelling-correcting');
+      $('#spelling-next-row')?.classList.add('hidden');
+      return;
+    }
+
+    // Success — either first-try or corrected after miss
+    const detail = res.correctedAfterMiss
+      ? 'typed: ' + typed + ' · corrected after miss'
+      : 'typed: ' + typed;
+    trackAnswer('Spelling', 'Spell: ' + (res.correct || st.word), true, detail);
+
     input.readOnly = true;
     input.disabled = false;
     input.blur();
-    if (res.ok) {
-      const p = profile();
-      if (!p.spelling) p.spelling = { completed: 0 };
-      p.spelling.completed = (p.spelling.completed || 0) + 1;
+    wordEl.textContent = res.correct;
+    wordEl.classList.remove('hidden-word', 'model-word');
+    $('#spelling-scramble').textContent = '';
+    $('#screen-spelling')?.classList.remove('spelling-correcting');
+
+    const p = profile();
+    if (!p.spelling) p.spelling = { completed: 0 };
+    p.spelling.completed = (p.spelling.completed || 0) + 1;
+
+    if (res.star) {
       KidsStorage.addStars(state, 1);
-      $('#spelling-feedback').textContent = `⭐ Correct! +1⭐`;
+      $('#spelling-feedback').textContent = '⭐ Correct! +1⭐';
       $('#spelling-feedback').className = 'feedback ok';
       confettiBurst();
       updateChrome();
     } else {
-      $('#spelling-feedback').textContent = `Almost — it's "${res.correct}"`;
-      $('#spelling-feedback').className = 'feedback bad';
-      $('#spelling-word').textContent = res.correct;
-      $('#spelling-word').classList.remove('hidden-word');
+      // Corrected after miss — advance without star
+      $('#spelling-feedback').textContent = 'Nice fix — you typed it the right way!';
+      $('#spelling-feedback').className = 'feedback ok';
+      updateChrome();
     }
     $('#spelling-next-row')?.classList.remove('hidden');
   }
@@ -1067,10 +1187,27 @@
     return set;
   }
 
+  function facingDirClass(face) {
+    if (face === '⬆️') return 'face-up';
+    if (face === '➡️') return 'face-right';
+    if (face === '⬇️') return 'face-down';
+    if (face === '⬅️') return 'face-left';
+    return 'face-right';
+  }
+
+  function facingChevron(face) {
+    if (face === '⬆️') return '▲';
+    if (face === '➡️') return '▶';
+    if (face === '⬇️') return '▼';
+    if (face === '⬅️') return '◀';
+    return '▶';
+  }
+
   function renderStemGrid(highlightRobot, facingEmoji, stepInfo) {
     const st = StemGame.getState();
     const wrap = $('#stem-grid');
-    const cellSize = window.matchMedia('(max-width: 520px)').matches ? 40 : 48;
+    const narrow = window.matchMedia('(max-width: 700px)').matches;
+    const cellSize = narrow ? 52 : 48;
     wrap.style.gridTemplateColumns = `repeat(${st.cols}, ${cellSize}px)`;
     const robot = highlightRobot || st.robot;
     const face = facingEmoji || (highlightRobot && highlightRobot.facingEmoji) || st.facingEmoji;
@@ -1108,7 +1245,19 @@
     const cell = wrap.querySelector(`[data-r="${robot.r}"][data-c="${robot.c}"]`);
     if (cell) {
       const bounce = executing ? ' executing' : '';
-      cell.innerHTML = `<span class="monkey robot${bounce}" title="${stemFacingLabel(st, face)}">🐵${face || ''}</span>`;
+      const label = stemFacingLabel(st, face);
+      const chevron = facingChevron(face);
+      const dirCls = facingDirClass(face);
+      cell.classList.add(dirCls);
+      cell.innerHTML = `<span class="monkey monkey-face robot${bounce}" title="${label}" aria-label="${label}">` +
+        `<span class="monkey-emoji">🐵</span>` +
+        `<span class="monkey-heading" aria-hidden="true">${chevron}</span>` +
+        `</span>`;
+      // Keep DIR emoji available for screen readers via title; also show small face emoji hint in heading row for clarity
+      const heading = cell.querySelector('.monkey-heading');
+      if (heading && face) {
+        heading.textContent = chevron + ' ' + (face || '');
+      }
     }
     updateStemFacing(face);
     if (stepInfo) {
@@ -1492,7 +1641,7 @@
       if (st.awaitEnter) {
         e.preventDefault();
         advanceSpelling();
-      } else if (st.phase === 'typing') {
+      } else if (st.phase === 'typing' || st.phase === 'correcting') {
         e.preventDefault();
         submitSpelling();
       }

@@ -16,12 +16,12 @@ Progress is saved in the browser (`localStorage`) per player profile. An optiona
 
 | Area | Features |
 |------|----------|
-| **Home** | Zion / Joziah / Zachariah with grade badges, star totals, fullscreen & sound, **Excel tracker** download |
+| **Home** | Profiles + stars, calm **learning journey** map (Monkey Code path + subject meters), **Excel tracker** |
 | **Pre-K TTS** | Zachariah auto read-aloud (Web Speech `speechSynthesis`); 🔊 replay on every grade; respects Sound off |
 | **Typing** | Home-row → words → short sentences; WPM/accuracy; **Press Enter for next** after each item |
-| **Math** | Auto-starts at the selected kid’s grade (Pre-K counting · G2 add/sub · G3 ×÷/fractions) |
+| **Math** | Auto-starts at the kid’s grade; wrong answers show CRA visual teach (arrays / grids / break-apart) then Next |
 | **Reading** | Pre-K phonics/letters/CVC · **Joziah (G2):** phonics warm-ups + sight words + chunked passages with **sentence / Hear it / word-tap** assists · G3 passages + comprehension |
-| **Spelling** | Memorize beat, then type the word; **Joziah** uses decodable / high-frequency words; Enter / Next word advances |
+| **Spelling** | Memorize beat, then type; wrong → show model & **re-type** before Next; stars on first-try only; **Joziah** decodable / HF words |
 | **Science** | Fun fact cards + light questions (animals, weather, plants, body, magnets) |
 | **Monkey Code** | Jungle coding path (CodeMonkey-inspired): 🐵 collect all 🍌 then 🧰 — 12 levels teaching sequencing → turns → loops → conditionals; grade-aware labels; PLAY + stars |
 | **Chess** | Fundamentals only: learn how pieces move on a mini board · quizzes to name pieces and how they move (♔♕♖♗♘♙) |
@@ -100,6 +100,16 @@ kids-learning/
 - **📊 Excel tracker** on Home: Download a spreadsheet of correct/incorrect answers per child to tailor practice later (log capped at ~2000 rows).
 - Stars and progress survive refresh (same browser/profile).
 - Old “Player 1/2/3” saves migrate to Zion/Joziah/Zachariah and keep stars when possible.
+
+
+## Feedback pedagogy (educator review)
+
+- **Touch targets:** Primary taps (choices, Monkey Code commands, level pills, PLAY) are ≥48–56px; ~56–64px on narrow screens for Pre-K / mobile.
+- **Monkey Code heading:** The monkey cell shows a large facing chevron + direction emoji under 🐵, with a tinted cell edge toward the facing direction (plus the text line “Monkey is looking …”).
+- **TTS / Hear-it:** Web Speech only. Prefers natural en-US voices when available. Word taps use a clearer slower rate; Hear-it / passages use sentence mode with light pauses between sentences. Quality depends on the device’s installed voices.
+- **Spelling — active correction:** A wrong answer shows the correct spelling as a scaffold and clears the input. The child must **re-type the correct word** before Next unlocks. Stars only on **first-try** correct; a successful correction advances without an extra star (Excel detail: `corrected after miss`).
+- **Math — visual process (CRA):** On a wrong answer, a teach panel shows emoji arrays / grids / crossed-out sets or a break-apart hint (capped ~24 icons), then Next. Immediate visual correction — no forced re-try for math facts.
+- **Home journey:** Calm “My learning journey” strip — 12 Monkey Code step dots + subject checkmarks/counts (not extra gamification clutter).
 
 ## Limitations
 

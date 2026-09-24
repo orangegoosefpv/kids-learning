@@ -1496,3 +1496,316 @@ body {
   text-align: center;
   font-size: 1.5rem;
 }
+
+/* ---- Educator review: larger touch targets + monkey heading + journey + math teach ---- */
+
+.choice-btn {
+  min-height: 52px;
+  min-width: 48px;
+  padding: 18px 16px;
+}
+.level-pill {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 12px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cmd-btn {
+  min-height: 56px;
+  padding: 12px 16px;
+}
+.btn-go {
+  min-height: 68px;
+}
+.math-answer-input {
+  min-height: 56px;
+}
+.btn-speak,
+.btn-home {
+  min-height: 52px;
+  min-width: 52px;
+}
+
+/* Monkey facing indicator — clear relative orientation */
+#screen-stem .monkey-face {
+  position: absolute;
+  inset: 1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  z-index: 2;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+}
+#screen-stem .monkey-face .monkey-emoji {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+#screen-stem .monkey-face .monkey-heading {
+  font-size: 1.05rem;
+  line-height: 1;
+  margin-top: -2px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.65), 0 0 6px rgba(255,200,50,0.8);
+  animation: headingPulse 1.1s ease-in-out infinite;
+}
+@keyframes headingPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.88; }
+}
+#screen-stem .cell.face-up {
+  box-shadow: inset 0 4px 0 0 #ffc857, inset 0 -3px 0 rgba(0,0,0,0.12);
+}
+#screen-stem .cell.face-right {
+  box-shadow: inset -4px 0 0 0 #ffc857, inset 0 -3px 0 rgba(0,0,0,0.12);
+}
+#screen-stem .cell.face-down {
+  box-shadow: inset 0 -4px 0 0 #ffc857;
+}
+#screen-stem .cell.face-left {
+  box-shadow: inset 4px 0 0 0 #ffc857, inset 0 -3px 0 rgba(0,0,0,0.12);
+}
+#screen-stem .cell.wall.face-up,
+#screen-stem .cell.wall.face-right,
+#screen-stem .cell.wall.face-down,
+#screen-stem .cell.wall.face-left {
+  /* keep wall look; tint still helps */
+}
+
+/* Math teach / CRA visual panel */
+#math-teach {
+  margin: 10px 0 8px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #fff8e8, #efe8ff);
+  border: 3px solid #d4c8f5;
+  border-radius: 16px;
+  text-align: center;
+}
+#math-teach.hidden { display: none !important; }
+.math-teach-title {
+  font-weight: 900;
+  font-size: 1.05rem;
+  color: var(--accent2);
+  margin-bottom: 8px;
+}
+.math-teach-visual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.55rem;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.math-teach-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  width: 100%;
+}
+.math-teach-grid {
+  display: inline-grid;
+  gap: 3px;
+  margin: 4px auto;
+}
+.math-teach-grid span {
+  width: 1.35em;
+  text-align: center;
+}
+.math-teach-removed {
+  opacity: 0.35;
+  text-decoration: line-through;
+  filter: grayscale(0.6);
+}
+.math-teach-hint {
+  font-weight: 800;
+  color: var(--muted);
+  font-size: 1rem;
+  margin-top: 4px;
+}
+.math-teach-answer {
+  font-weight: 900;
+  font-size: 1.2rem;
+  color: #1ea855;
+  margin-top: 6px;
+}
+
+/* Spelling correction scaffold */
+.spelling-word.model-word {
+  background: #e8fff0;
+  border: 3px solid #2ed573;
+  color: #0a6b38;
+  letter-spacing: 0.14em;
+}
+.spelling-correcting .typing-input {
+  border-color: #ffc857;
+  box-shadow: 0 0 0 4px rgba(255, 200, 87, 0.28);
+}
+
+/* Journey map — calm macro progress */
+.journey-map {
+  margin-top: 16px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-radius: 18px;
+  color: #fff;
+}
+.journey-map h3 {
+  font-size: 1.15rem;
+  font-weight: 900;
+  margin-bottom: 12px;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.journey-stem {
+  margin-bottom: 14px;
+}
+.journey-stem-label {
+  font-weight: 800;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+  opacity: 0.95;
+}
+.journey-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.journey-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  display: grid;
+  place-items: center;
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: transparent;
+  transition: background 0.2s, border-color 0.2s;
+}
+.journey-dot.done {
+  background: #2ed573;
+  border-color: #a8f5c8;
+  color: #0a2e18;
+  box-shadow: 0 0 0 2px rgba(46, 213, 115, 0.25);
+}
+.journey-dot.current {
+  border-color: #ffc857;
+  box-shadow: 0 0 0 3px rgba(255, 200, 87, 0.35);
+}
+.journey-subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+.journey-subj {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  min-height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-weight: 800;
+  font-size: 0.88rem;
+}
+.journey-subj.met {
+  background: rgba(46, 213, 115, 0.22);
+  border-color: rgba(168, 245, 200, 0.55);
+}
+.journey-subj .j-check {
+  color: #2ed573;
+  font-weight: 900;
+}
+.journey-subj .j-count {
+  color: #ffc857;
+  font-weight: 900;
+}
+
+/* Mobile / Pre-K generous tap padding */
+@media (max-width: 700px) {
+  .choice-btn {
+    min-height: 60px;
+    min-width: 56px;
+    padding: 18px 14px;
+    font-size: clamp(1.15rem, 4vw, 1.5rem);
+  }
+  .choice-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+  }
+  .level-pill {
+    min-height: 52px;
+    padding: 14px 18px;
+    font-size: 1rem;
+  }
+  .cmd-btn {
+    min-height: 60px;
+    padding: 14px 16px;
+    font-size: 1.1rem;
+  }
+  #screen-stem.grade-prek .cmd-btn {
+    min-height: 64px;
+    font-size: 1.18rem;
+  }
+  .btn-go {
+    min-height: 72px;
+    font-size: 1.55rem !important;
+  }
+  .btn-next {
+    min-height: 56px;
+    min-width: 180px;
+  }
+  .btn-speak,
+  .btn-home {
+    min-height: 56px;
+    min-width: 56px;
+  }
+  .math-answer-input {
+    min-height: 60px;
+    font-size: 1.9rem;
+  }
+  .typing-input {
+    min-height: 56px;
+    padding: 18px;
+    font-size: 1.35rem;
+  }
+  #screen-stem .cell {
+    width: 52px;
+    height: 52px;
+    font-size: 1.4rem;
+  }
+  #screen-stem .monkey-face .monkey-emoji { font-size: 1.5rem; }
+  #screen-stem .monkey-face .monkey-heading { font-size: 1.1rem; }
+  #screen-stem .banana-emoji,
+  #screen-stem .treasure-emoji { font-size: 1.45rem; }
+  .journey-dot {
+    width: 26px;
+    height: 26px;
+  }
+  .journey-subj {
+    min-height: 48px;
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  /* Override older shrink rule — keep cells tappable */
+  #screen-stem .cell {
+    width: 48px;
+    height: 48px;
+    font-size: 1.3rem;
+  }
+  .btn-go { min-height: 64px; font-size: 1.4rem !important; }
+}

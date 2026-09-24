@@ -1,4 +1,5 @@
-/* Spelling trainer — type the word; Enter submits / continues */
+/* Spelling trainer — type the word; Enter submits / continues.
+   Wrong answers require active correction (re-type the correct word). */
 (function (global) {
   function shuffle(arr) {
     const a = arr.slice();
@@ -66,9 +67,11 @@
   let deck = [];
   let idx = 0;
   let item = null;
-  let phase = 'show'; // show | hide | typing | done | awaitEnter
+  let phase = 'show'; // show | hide | typing | correcting | awaitEnter
   let scrambled = '';
   let locked = false;
+  let missedOnce = false; // true if first attempt was wrong
+  let firstTryCorrect = false;
 
   function scramble(word) {
     if (word.length <= 2) return word.split('').join(' ');
@@ -84,6 +87,8 @@
     deck = shuffle(WORDS[grade]);
     idx = 0;
     locked = false;
+    missedOnce = false;
+    firstTryCorrect = false;
     nextItem(true);
     return getState();
   }
@@ -100,6 +105,8 @@
     scrambled = scramble(item.word);
     phase = 'show';
     locked = false;
+    missedOnce = false;
+    firstTryCorrect = false;
   }
 
   function beginTyping() {
@@ -113,16 +120,81 @@
     if (phase === 'show') phase = 'hide';
   }
 
+  /**
+   * check(typed)
+   * Returns:
+   *   { ok, correct, word, star, correcting, correctedAfterMiss }
+   * - First-try correct → ok, star, awaitEnter
+   * - Wrong → correcting phase (must re-type); no advance
+   * - Correction match → ok without star, awaitEnter, correctedAfterMiss
+   */
   function check(typed) {
-    if (locked || !item || (phase !== 'typing' && phase !== 'hide' && phase !== 'show')) return null;
+    if (locked || !item) return null;
+    if (phase !== 'typing' && phase !== 'hide' && phase !== 'show' && phase !== 'correcting') return null;
     const guess = String(typed || '').trim().toLowerCase();
     if (!guess) return null;
+
+    const target = item.word.toLowerCase();
+    const ok = guess === target;
+
+    if (phase === 'correcting') {
+      if (!ok) {
+        KidsAudio.wrong();
+        return {
+          ok: false,
+          correct: item.word,
+          word: item.word,
+          star: false,
+          correcting: true,
+          stillCorrecting: true,
+          correctedAfterMiss: false
+        };
+      }
+      locked = true;
+      phase = 'awaitEnter';
+      KidsAudio.correct();
+      return {
+        ok: true,
+        correct: item.word,
+        word: item.word,
+        star: false,
+        correcting: false,
+        correctedAfterMiss: true
+      };
+    }
+
+    // First attempt (typing / hide / show)
     locked = true;
-    const ok = guess === item.word.toLowerCase();
-    phase = 'awaitEnter';
-    if (ok) KidsAudio.correct();
-    else KidsAudio.wrong();
-    return { ok, correct: item.word, word: item.word };
+    if (ok) {
+      firstTryCorrect = true;
+      missedOnce = false;
+      phase = 'awaitEnter';
+      KidsAudio.correct();
+      return {
+        ok: true,
+        correct: item.word,
+        word: item.word,
+        star: true,
+        correcting: false,
+        correctedAfterMiss: false
+      };
+    }
+
+    // Wrong — enter active correction; unlock so they can re-type
+    missedOnce = true;
+    firstTryCorrect = false;
+    locked = false;
+    phase = 'correcting';
+    KidsAudio.wrong();
+    return {
+      ok: false,
+      correct: item.word,
+      word: item.word,
+      star: false,
+      correcting: true,
+      stillCorrecting: true,
+      correctedAfterMiss: false
+    };
   }
 
   function continueNext() {
@@ -140,7 +212,10 @@
       emoji: item ? item.emoji : '',
       scrambled,
       showWord: phase === 'show',
-      awaitEnter: phase === 'awaitEnter'
+      awaitEnter: phase === 'awaitEnter',
+      correcting: phase === 'correcting',
+      missedOnce,
+      firstTryCorrect
     };
   }
 
