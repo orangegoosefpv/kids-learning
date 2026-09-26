@@ -1,6 +1,6 @@
 /* Space Fox Flyer — top-down arena shooter
    Hangar shop · map upgrade stations · points · 7-min timed flights.
-   Original kid-friendly game (emoji/canvas art). No third-party IP assets. */
+   Waves · player HP · slow bright targets. Original kid-friendly game. */
 (function (global) {
   const SESSION_SECONDS = 7 * 60;
   const QUESTIONS_TO_UNLOCK = 10;
@@ -8,6 +8,16 @@
   /** Pull camera OUT so plane, bullets, and enemies are clearly visible. */
   const CAM_ZOOM = 0.48;
   const MAX_EQUIP_PERKS = 2;
+  const PLAYER_MAX_HP = 5;
+  const HIT_INVULN = 90; // frames (~1.5s) after a hit
+  /** Escalating waves across the 7-minute session (at = elapsed seconds). */
+  const WAVE_DEFS = [
+    { id: 1, at: 0,   title: 'Wave 1', subtitle: 'Easy patrol',   speedMul: 0.42, densMul: 0.65, hp: 1,   shoot: 0,    boss: false, color: '#55efc4' },
+    { id: 2, at: 90,  title: 'Wave 2', subtitle: 'Medium swarm',  speedMul: 0.55, densMul: 0.95, hp: 1,   shoot: 0.12, boss: false, color: '#74b9ff' },
+    { id: 3, at: 180, title: 'Wave 3', subtitle: 'Hard chase',    speedMul: 0.68, densMul: 1.2,  hp: 1.5, shoot: 0.28, boss: false, color: '#ffeaa7' },
+    { id: 4, at: 300, title: 'Wave 4', subtitle: 'Heavy drones',  speedMul: 0.8,  densMul: 1.45, hp: 2,   shoot: 0.4,  boss: false, color: '#ff7675' },
+    { id: 5, at: 360, title: 'Wave 5', subtitle: 'Boss rush!',    speedMul: 0.9,  densMul: 1.15, hp: 3,   shoot: 0.5,  boss: true,  color: '#a29bfe' }
+  ];
 
   const WORLDS = [
     {
@@ -196,6 +206,13 @@
   let fireHeld = false;
   let activeWeapon = 'normal';
   let stationCooldown = {};
+  let enemyBullets = [];
+  let currentWaveIdx = 0;
+  let waveBannerT = 0;
+  let waveBannerTitle = '';
+  let waveBannerSub = '';
+  let waveBannerColor = '#55efc4';
+  let spawnClock = 0;
 
   function $(sel, root) {
     return (root || document).querySelector(sel);
@@ -216,13 +233,32 @@
   function isPrek() { return grade === 'prek'; }
 
   function difficulty() {
+    // enemySpeed kept low so kids can see and dodge; waves scale it further.
     if (grade === 'prek') {
-      return { thrust: 0.22, turn: 0.08, maxSpeed: 4.2, fireMs: 320, bulletSpeed: 9, enemySpeed: 0.9, hitPad: 10 };
+      return { thrust: 0.22, turn: 0.08, maxSpeed: 4.2, fireMs: 320, bulletSpeed: 9, enemySpeed: 0.45, hitPad: 10 };
     }
     if (grade === 'grade3') {
-      return { thrust: 0.28, turn: 0.1, maxSpeed: 5.6, fireMs: 220, bulletSpeed: 11, enemySpeed: 1.5, hitPad: 4 };
+      return { thrust: 0.28, turn: 0.1, maxSpeed: 5.6, fireMs: 220, bulletSpeed: 11, enemySpeed: 0.75, hitPad: 4 };
     }
-    return { thrust: 0.25, turn: 0.09, maxSpeed: 5, fireMs: 260, bulletSpeed: 10, enemySpeed: 1.2, hitPad: 6 };
+    return { thrust: 0.25, turn: 0.09, maxSpeed: 5, fireMs: 260, bulletSpeed: 10, enemySpeed: 0.6, hitPad: 6 };
+  }
+
+  function waveDef(idx) {
+    return WAVE_DEFS[Math.max(0, Math.min(WAVE_DEFS.length - 1, idx))];
+  }
+
+  function waveForElapsed(elapsed) {
+    let idx = 0;
+    for (let i = 0; i < WAVE_DEFS.length; i++) {
+      if (elapsed >= WAVE_DEFS[i].at) idx = i;
+    }
+    return idx;
+  }
+
+  function enemyTint(kind, boss) {
+    if (boss) return { fill: 'rgba(162,155,254,0.55)', ring: '#ffeaa7', glow: '#a29bfe' };
+    if (kind === 'asteroid') return { fill: 'rgba(255,159,67,0.5)', ring: '#fff', glow: '#ff9f43' };
+    return { fill: 'rgba(255,118,117,0.55)', ring: '#fff', glow: '#ff6b6b' };
   }
 
   function defaultProgress() {
@@ -737,8 +773,10 @@
       vy: 0,
       angle: -Math.PI / 2,
       alive: true,
-      invuln: 0,
+      invuln: HIT_INVULN * 0.4,
       shield: equippedPerks.shield ? 3 : 1,
+      hp: PLAYER_MAX_HP,
+      maxHp: PLAYER_MAX_HP,
       maxSpeed,
       fireMs,
       turn: diff.turn * sh.turn,
@@ -750,6 +788,7 @@
       longBurst: !!equippedPerks.burst
     };
     bullets = [];
+    enemyBullets = [];
     particles = [];
     score = 0;
     pointsEarnedRun = 0;
@@ -759,7 +798,14 @@
     flavor = pickFlavor();
     activeWeapon = 'normal';
     stationCooldown = {};
-    entities = spawnArena(wd, arena);
+    currentWaveIdx = 0;
+    spawnClock = 0;
+    const w0 = waveDef(0);
+    waveBannerTitle = w0.title;
+    waveBannerSub = w0.subtitle;
+    waveBannerColor = w0.color;
+    waveBannerT = 2.8;
+    entities = spawnArena(wd, arena, w0);
     cam = { x: plane.x, y: plane.y };
     keys = {};
     pad = { up: false, down: false, left: false, right: false, fire: false };
@@ -803,10 +849,83 @@
     ];
   }
 
-  function spawnArena(wd, arena) {
+  function waveTargetCounts(wd, wave) {
+    const dens = wave && wave.densMul != null ? wave.densMul : 1;
+    const baseE = isPrek() ? Math.max(3, wd.enemies - 3) : wd.enemies;
+    const baseR = isPrek() ? Math.max(2, wd.asteroids - 2) : wd.asteroids;
+    return {
+      enemies: Math.max(2, Math.round(baseE * dens)),
+      asteroids: Math.max(1, Math.round(baseR * Math.min(1.35, dens)))
+    };
+  }
+
+  function makeEnemy(wd, x, y, wave, opts) {
+    const o = opts || {};
+    const boss = !!o.boss || !!(wave && wave.boss && o.forceBoss);
+    const ang = Math.random() * Math.PI * 2;
+    const speedMul = (wave && wave.speedMul) || 0.5;
+    const baseSpd = (0.25 + Math.random() * 0.45) * speedMul;
+    const tint = enemyTint('enemy', boss);
+    const hpBase = (wave && wave.hp) || 1;
+    const hp = boss ? Math.max(6, Math.ceil(hpBase * 4)) : Math.max(1, Math.ceil(hpBase));
+    return {
+      type: 'enemy',
+      x, y,
+      vx: Math.cos(ang) * baseSpd,
+      vy: Math.sin(ang) * baseSpd,
+      r: boss ? (isPrek() ? 48 : 42) : (isPrek() ? 34 : 30),
+      emoji: boss ? '👹' : wd.enemyEmoji,
+      hp,
+      maxHp: hp,
+      points: boss ? 80 : (12 + Math.round(hp * 6)),
+      boss,
+      shootCd: 1.2 + Math.random() * 1.5,
+      canShoot: !!(wave && wave.shoot > 0) || boss,
+      shootChance: boss ? Math.max(0.55, (wave && wave.shoot) || 0.5) : ((wave && wave.shoot) || 0),
+      tint,
+      pulse: Math.random() * Math.PI * 2
+    };
+  }
+
+  function makeAsteroid(wd, x, y, wave) {
+    const ang = Math.random() * Math.PI * 2;
+    const speedMul = (wave && wave.speedMul) || 0.5;
+    const spd = (0.18 + Math.random() * 0.35) * speedMul;
+    const hp = Math.max(1, Math.ceil(((wave && wave.hp) || 1) * 0.85));
+    const tint = enemyTint('asteroid', false);
+    return {
+      type: 'asteroid',
+      x, y,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd,
+      r: (isPrek() ? 26 : 22) + Math.random() * 12,
+      emoji: wd.rockEmoji,
+      hp,
+      maxHp: hp,
+      points: 8 + hp * 4,
+      spin: (Math.random() - 0.5) * 0.03,
+      tint,
+      pulse: Math.random() * Math.PI * 2
+    };
+  }
+
+  function randAway(arena, margin, minDist) {
+    let x, y, tries = 0;
+    const cx = plane ? plane.x : arena / 2;
+    const cy = plane ? plane.y : arena / 2;
+    do {
+      x = margin + Math.random() * (arena - margin * 2);
+      y = margin + Math.random() * (arena - margin * 2);
+      tries++;
+    } while (tries < 28 && Math.hypot(x - cx, y - cy) < (minDist || 260));
+    return { x, y };
+  }
+
+  function spawnArena(wd, arena, wave) {
     const list = [];
     const margin = 100;
     const rand = (a, b) => a + Math.random() * (b - a);
+    const wv = wave || waveDef(0);
     const awayFromCenter = () => {
       let x, y, tries = 0;
       do {
@@ -837,40 +956,14 @@
       });
     });
 
-    const enemyN = isPrek() ? Math.max(4, wd.enemies - 3) : wd.enemies;
-    for (let i = 0; i < enemyN; i++) {
+    const counts = waveTargetCounts(wd, wv);
+    for (let i = 0; i < counts.enemies; i++) {
       const p = awayFromCenter();
-      const ang = Math.random() * Math.PI * 2;
-      const spd = 0.6 + Math.random() * 1.1;
-      list.push({
-        type: 'enemy',
-        x: p.x,
-        y: p.y,
-        vx: Math.cos(ang) * spd,
-        vy: Math.sin(ang) * spd,
-        r: isPrek() ? 26 : 22,
-        emoji: wd.enemyEmoji,
-        hp: 1,
-        points: 15
-      });
+      list.push(makeEnemy(wd, p.x, p.y, wv, {}));
     }
-    const rockN = isPrek() ? Math.max(3, wd.asteroids - 2) : wd.asteroids;
-    for (let i = 0; i < rockN; i++) {
+    for (let i = 0; i < counts.asteroids; i++) {
       const p = awayFromCenter();
-      const ang = Math.random() * Math.PI * 2;
-      const spd = 0.35 + Math.random() * 0.7;
-      list.push({
-        type: 'asteroid',
-        x: p.x,
-        y: p.y,
-        vx: Math.cos(ang) * spd,
-        vy: Math.sin(ang) * spd,
-        r: 18 + Math.random() * 14,
-        emoji: wd.rockEmoji,
-        hp: 1,
-        points: 10,
-        spin: (Math.random() - 0.5) * 0.04
-      });
+      list.push(makeAsteroid(wd, p.x, p.y, wv));
     }
     for (let i = 0; i < wd.stars; i++) {
       const p = awayFromCenter();
@@ -878,7 +971,7 @@
         type: 'star',
         x: p.x,
         y: p.y,
-        r: isPrek() ? 24 : 20,
+        r: isPrek() ? 28 : 24,
         emoji: wd.starEmoji,
         got: false,
         points: 25,
@@ -901,50 +994,73 @@
   function respawnTarget(type) {
     const wd = world();
     const arena = wd.arena;
-    const margin = 100;
-    let x, y, tries = 0;
-    do {
-      x = margin + Math.random() * (arena - margin * 2);
-      y = margin + Math.random() * (arena - margin * 2);
-      tries++;
-    } while (tries < 25 && plane && Math.hypot(x - plane.x, y - plane.y) < 260);
-    const ang = Math.random() * Math.PI * 2;
-    if (type === 'enemy') {
-      const spd = 0.6 + Math.random() * 1.1;
-      return {
-        type: 'enemy',
-        x, y,
-        vx: Math.cos(ang) * spd,
-        vy: Math.sin(ang) * spd,
-        r: isPrek() ? 26 : 22,
-        emoji: wd.enemyEmoji,
-        hp: 1,
-        points: 15
-      };
-    }
-    if (type === 'asteroid') {
-      const spd = 0.35 + Math.random() * 0.7;
-      return {
-        type: 'asteroid',
-        x, y,
-        vx: Math.cos(ang) * spd,
-        vy: Math.sin(ang) * spd,
-        r: 18 + Math.random() * 14,
-        emoji: wd.rockEmoji,
-        hp: 1,
-        points: 10,
-        spin: (Math.random() - 0.5) * 0.04
-      };
-    }
+    const wave = waveDef(currentWaveIdx);
+    const p = randAway(arena, 100, 260);
+    if (type === 'enemy') return makeEnemy(wd, p.x, p.y, wave, {});
+    if (type === 'asteroid') return makeAsteroid(wd, p.x, p.y, wave);
     return {
       type: 'star',
-      x, y,
-      r: isPrek() ? 24 : 20,
+      x: p.x, y: p.y,
+      r: isPrek() ? 28 : 24,
       emoji: wd.starEmoji,
       got: false,
       points: 25,
       bob: Math.random() * Math.PI * 2
     };
+  }
+
+  function startWave(idx, announce) {
+    currentWaveIdx = idx;
+    const wv = waveDef(idx);
+    if (announce) {
+      waveBannerTitle = wv.title;
+      waveBannerSub = wv.subtitle;
+      waveBannerColor = wv.color;
+      waveBannerT = 2.8;
+      flavor = `${wv.title} — ${wv.subtitle}!`;
+    }
+    const wd = world();
+    const arena = wd.arena;
+    const counts = waveTargetCounts(wd, wv);
+    let enemies = entities.filter(e => e.type === 'enemy').length;
+    let rocks = entities.filter(e => e.type === 'asteroid').length;
+    // Burst-spawn up to target density for the new wave
+    while (enemies < counts.enemies) {
+      const p = randAway(arena, 100, 280);
+      entities.push(makeEnemy(wd, p.x, p.y, wv, {}));
+      enemies++;
+    }
+    while (rocks < counts.asteroids) {
+      const p = randAway(arena, 100, 280);
+      entities.push(makeAsteroid(wd, p.x, p.y, wv));
+      rocks++;
+    }
+    if (wv.boss) {
+      const p = randAway(arena, 120, 320);
+      entities.push(makeEnemy(wd, p.x, p.y, wv, { forceBoss: true }));
+      flavor = '👹 Mini-boss on the map — big glow, big points!';
+    }
+  }
+
+  function maintainWaveSpawns(dt) {
+    spawnClock += dt;
+    if (spawnClock < 1.1) return;
+    spawnClock = 0;
+    if (!plane || flightDone) return;
+    const wd = world();
+    const arena = wd.arena;
+    const wv = waveDef(currentWaveIdx);
+    const counts = waveTargetCounts(wd, wv);
+    const enemies = entities.filter(e => e.type === 'enemy').length;
+    const rocks = entities.filter(e => e.type === 'asteroid').length;
+    if (enemies < counts.enemies) {
+      const p = randAway(arena, 100, 300);
+      entities.push(makeEnemy(wd, p.x, p.y, wv, {}));
+    }
+    if (rocks < counts.asteroids) {
+      const p = randAway(arena, 100, 300);
+      entities.push(makeAsteroid(wd, p.x, p.y, wv));
+    }
   }
 
   function updateHud() {
@@ -965,6 +1081,25 @@
     if (we) {
       const stDef = STATIONS.find(x => x.weapon === activeWeapon);
       we.textContent = stDef ? `${stDef.emoji} ${stDef.short}` : '🔫 Normal';
+    }
+    const wv = waveDef(currentWaveIdx);
+    const waveEl = $('#flight-wave-hud');
+    if (waveEl) {
+      waveEl.textContent = wv.title;
+      waveEl.style.borderColor = wv.color;
+      waveEl.style.color = '#2d3436';
+      waveEl.style.background = wv.color;
+    }
+    const hpFill = $('#flight-hp-fill');
+    const hpLabel = $('#flight-hp-label');
+    if (plane && hpFill) {
+      const pct = Math.max(0, Math.min(100, (plane.hp / (plane.maxHp || PLAYER_MAX_HP)) * 100));
+      hpFill.style.width = pct + '%';
+      hpFill.classList.toggle('low', plane.hp <= 2);
+      hpFill.classList.toggle('mid', plane.hp === 3);
+    }
+    if (plane && hpLabel) {
+      hpLabel.textContent = `❤️ ${plane.hp}/${plane.maxHp || PLAYER_MAX_HP}`;
     }
   }
 
@@ -988,7 +1123,15 @@
       return;
     }
 
+    const elapsed = SESSION_SECONDS - sessionLeft;
+    const wantWave = waveForElapsed(elapsed);
+    if (wantWave > currentWaveIdx) {
+      startWave(wantWave, true);
+    }
+    if (waveBannerT > 0) waveBannerT = Math.max(0, waveBannerT - dt);
+
     stepPhysics(w, h, dt);
+    if (flightDone) return;
     drawFly(ctx, w, h);
     updateHud();
 
@@ -1012,8 +1155,9 @@
 
     if (e.weapon === 'shieldpad') {
       plane.shield = Math.min(5, (plane.shield || 0) + 2);
-      plane.invuln = Math.max(plane.invuln, 50);
-      flavor = '🛡️ Shield buoy — bubbles up!';
+      plane.invuln = Math.max(plane.invuln, HIT_INVULN * 0.6);
+      plane.hp = Math.min(plane.maxHp || PLAYER_MAX_HP, plane.hp + 1);
+      flavor = '🛡️ Shield buoy — bubbles + a heart!';
     } else {
       activeWeapon = e.weapon;
       flavor = `${e.emoji} ${e.name} unlocked for this flight!`;
@@ -1117,16 +1261,16 @@
           e.hp -= dmg;
           bullets.splice(i, 1);
           if (e.hp <= 0) {
+            const kind = e.type;
+            const wasBoss = !!e.boss;
             popDestroy(e);
             addScore(e.points);
             collected.kills++;
-            const kind = e.type;
             entities.splice(j, 1);
-            setTimeout(() => {
-              if (mode === 'fly' && !flightDone) entities.push(respawnTarget(kind));
-            }, 900 + Math.random() * 1200);
             if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
-            flavor = kind === 'enemy' ? 'Drone down — nice shot!' : 'Rock blasted — soft pop!';
+            flavor = wasBoss
+              ? '👹 Boss down — amazing!'
+              : (kind === 'enemy' ? 'Drone down — nice shot!' : 'Rock blasted — soft pop!');
           } else {
             spawnSparks(e.x, e.y, '#ffeaa7', 4);
           }
@@ -1157,18 +1301,27 @@
         continue;
       }
       if (e.type === 'enemy' || e.type === 'asteroid') {
+        e.pulse = (e.pulse || 0) + dt * 3.2;
         if (e.type === 'enemy' && plane) {
           const dx = plane.x - e.x;
           const dy = plane.y - e.y;
           const dist = Math.hypot(dx, dy) || 1;
-          const chase = diff.enemySpeed * 0.015 * (dt * 60);
+          const wv = waveDef(currentWaveIdx);
+          const chase = diff.enemySpeed * wv.speedMul * 0.012 * (dt * 60);
           e.vx += (dx / dist) * chase;
           e.vy += (dy / dist) * chase;
           const es = Math.hypot(e.vx, e.vy);
-          const maxE = diff.enemySpeed * (isPrek() ? 1.4 : 2.2);
+          const maxE = diff.enemySpeed * wv.speedMul * (isPrek() ? 1.15 : 1.55) * (e.boss ? 1.25 : 1);
           if (es > maxE) {
             e.vx = (e.vx / es) * maxE;
             e.vy = (e.vy / es) * maxE;
+          }
+          if (e.canShoot && e.shootChance > 0) {
+            e.shootCd = (e.shootCd || 1.5) - dt;
+            if (e.shootCd <= 0 && dist < 520) {
+              e.shootCd = e.boss ? 1.4 : (2.4 + Math.random() * 1.6);
+              if (Math.random() < e.shootChance) fireEnemyShot(e);
+            }
           }
         }
         e.x += e.vx * (dt * 60);
@@ -1179,6 +1332,23 @@
         if (e.x > arena - er) { e.x = arena - er; e.vx = -Math.abs(e.vx); }
         if (e.y < er) { e.y = er; e.vy = Math.abs(e.vy); }
         if (e.y > arena - er) { e.y = arena - er; e.vy = -Math.abs(e.vy); }
+      }
+    }
+
+    // Soft enemy shots (slow glowing orbs)
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+      const b = enemyBullets[i];
+      b.x += b.vx * (dt * 60);
+      b.y += b.vy * (dt * 60);
+      b.life -= dt;
+      if (b.life <= 0 || b.x < -40 || b.y < -40 || b.x > arena + 40 || b.y > arena + 40) {
+        enemyBullets.splice(i, 1);
+        continue;
+      }
+      if (plane && plane.invuln <= 0 && Math.hypot(b.x - plane.x, b.y - plane.y) < b.r + plane.r - 2) {
+        enemyBullets.splice(i, 1);
+        hurtPlayer(1, b);
+        if (flightDone) return;
       }
     }
 
@@ -1206,9 +1376,12 @@
           flavor = 'Star grabbed!';
         } else if ((e.type === 'enemy' || e.type === 'asteroid') && plane.invuln <= 0) {
           softBump(e);
+          if (flightDone) return;
         }
       }
     }
+
+    maintainWaveSpawns(dt);
 
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -1219,25 +1392,55 @@
     }
   }
 
-  function softBump(e) {
-    const dx = plane.x - e.x;
-    const dy = plane.y - e.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    plane.vx += (dx / dist) * 3.5;
-    plane.vy += (dy / dist) * 3.5;
-    e.vx -= (dx / dist) * 1.5;
-    e.vy -= (dy / dist) * 1.5;
-    plane.invuln = 40;
+  function hurtPlayer(amount, knockFrom) {
+    if (!plane || plane.invuln > 0 || flightDone) return;
+    const dmg = Math.max(1, amount || 1);
+    if (knockFrom) {
+      const dx = plane.x - knockFrom.x;
+      const dy = plane.y - knockFrom.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      plane.vx += (dx / dist) * 3.2;
+      plane.vy += (dy / dist) * 3.2;
+      if (knockFrom.vx != null) {
+        knockFrom.vx -= (dx / dist) * 1.4;
+        knockFrom.vy -= (dy / dist) * 1.4;
+      }
+    }
+    plane.invuln = HIT_INVULN;
     if (plane.shield > 0) {
       plane.shield -= 1;
       score = Math.max(0, score - 1);
-      flavor = plane.shield > 0 ? 'Shield soaked it — keep flying!' : 'Shield gone — still soft bumps only!';
+      flavor = plane.shield > 0 ? '🛡️ Shield soaked it!' : '🛡️ Shield gone — watch your HP!';
+      spawnSparks(plane.x, plane.y, '#74b9ff', 8);
     } else {
-      score = Math.max(0, score - 3);
-      flavor = 'Whoops — soft bump! Keep flying!';
+      plane.hp = Math.max(0, plane.hp - dmg);
+      score = Math.max(0, score - 2);
+      flavor = plane.hp > 0 ? `Ouch! HP ${plane.hp}/${plane.maxHp}` : 'Hull empty — limping home…';
+      spawnSparks(plane.x, plane.y, '#ff7675', 10);
     }
-    spawnSparks(plane.x, plane.y, '#a29bfe', 6);
     if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
+    if (plane.hp <= 0) {
+      finishFlight(true, 'ko');
+    }
+  }
+
+  function softBump(e) {
+    hurtPlayer(1, e);
+  }
+
+  function fireEnemyShot(e) {
+    if (!plane) return;
+    const ang = Math.atan2(plane.y - e.y, plane.x - e.x);
+    const spd = e.boss ? 2.1 : 1.55;
+    enemyBullets.push({
+      x: e.x,
+      y: e.y,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd,
+      r: e.boss ? 12 : 9,
+      life: 3.2,
+      color: e.boss ? '#a29bfe' : '#ff7675'
+    });
   }
 
   function pushBullet(ang, speed, opts) {
@@ -1407,16 +1610,59 @@
       ctx.save();
       ctx.translate(e.x, e.y + bobY);
       if (e.angle) ctx.rotate(e.angle);
-      ctx.font = `${e.type === 'asteroid' ? Math.round(e.r * 1.6) : 28}px serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(e.emoji, 0, 0);
-      if (e.type === 'star') {
+      if (e.type === 'enemy' || e.type === 'asteroid') {
+        const tint = e.tint || enemyTint(e.type, e.boss);
+        const pulse = 0.55 + Math.sin(e.pulse || 0) * 0.35;
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-        ctx.lineWidth = 2;
+        ctx.fillStyle = tint.fill;
+        ctx.globalAlpha = 0.35 + pulse * 0.35;
+        ctx.arc(0, 0, e.r + 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.fillStyle = tint.fill;
         ctx.arc(0, 0, e.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = tint.ring;
+        ctx.lineWidth = e.boss ? 5 : 3.5;
+        ctx.shadowColor = tint.glow;
+        ctx.shadowBlur = 14 + pulse * 10;
         ctx.stroke();
+        ctx.shadowBlur = 0;
+        // Dark inner outline for clarity
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.lineWidth = 2;
+        ctx.arc(0, 0, e.r - 1, 0, Math.PI * 2);
+        ctx.stroke();
+        const fontPx = Math.round(e.r * (e.boss ? 1.55 : 1.7));
+        ctx.font = `${fontPx}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(e.emoji, 0, 0);
+        if (e.maxHp && e.maxHp > 1) {
+          const bw = e.r * 1.6;
+          const pct = Math.max(0, e.hp / e.maxHp);
+          ctx.fillStyle = 'rgba(0,0,0,0.45)';
+          ctx.fillRect(-bw / 2, -e.r - 14, bw, 6);
+          ctx.fillStyle = e.boss ? '#ffeaa7' : '#55efc4';
+          ctx.fillRect(-bw / 2, -e.r - 14, bw * pct, 6);
+        }
+      } else {
+        ctx.font = `${Math.round(e.r * 1.7)}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(e.emoji, 0, 0);
+        if (e.type === 'star') {
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+          ctx.lineWidth = 3;
+          ctx.shadowColor = '#ffd93d';
+          ctx.shadowBlur = 10;
+          ctx.arc(0, 0, e.r, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
       }
       ctx.restore();
     }
@@ -1429,6 +1675,19 @@
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
+    }
+
+    for (const b of enemyBullets) {
+      ctx.beginPath();
+      ctx.fillStyle = b.color || '#ff7675';
+      ctx.shadowColor = b.color || '#ff7675';
+      ctx.shadowBlur = 12;
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
 
     for (const p of particles) {
@@ -1472,6 +1731,29 @@
         ctx.lineWidth = 6;
         ctx.strokeRect(3, 3, w - 6, h - 6);
       }
+    }
+
+    // Wave banner overlay (screen space)
+    if (waveBannerT > 0) {
+      const fadeIn = Math.min(1, (2.8 - waveBannerT) / 0.35 + 0.15);
+      const fadeOut = Math.min(1, waveBannerT / 0.4);
+      const alpha = Math.min(fadeIn, fadeOut);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(w * 0.15, h * 0.18, w * 0.7, 78);
+      ctx.strokeStyle = waveBannerColor || '#55efc4';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(w * 0.15, h * 0.18, w * 0.7, 78);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 32px system-ui, sans-serif';
+      ctx.fillText(waveBannerTitle || 'Wave', w / 2, h * 0.18 + 30);
+      ctx.font = 'bold 16px system-ui, sans-serif';
+      ctx.fillStyle = waveBannerColor || '#55efc4';
+      ctx.fillText(waveBannerSub || '', w / 2, h * 0.18 + 56);
+      ctx.restore();
     }
   }
 
@@ -1555,16 +1837,19 @@
     earned = Math.max(success ? 1 : 0, Math.min(5, earned));
 
     const timeup = reason === 'timeup';
+    const ko = reason === 'ko';
     const nextUnlock = worldIdx + 1;
     const pointsGained = Math.max(0, Math.round(pointsEarnedRun || score));
+    // Time-up still locks flight (question gate). HP=0 ends the run but does NOT lock.
+    const didOk = !!success || ko;
 
     const progressPatch = {
-      completedDelta: success ? 1 : 0,
+      completedDelta: didOk ? 1 : 0,
       score,
       pointsGained,
       starsEarned: earned,
       worldId: worldIdx,
-      unlockWorld: (success && nextUnlock < WORLDS.length) ? nextUnlock : null,
+      unlockWorld: (didOk && !ko && nextUnlock < WORLDS.length) ? nextUnlock : null,
       rings: collected.kills,
       stars: collected.stars,
       kills: collected.kills,
@@ -1589,28 +1874,31 @@
     const gate = $('#flight-results-gate');
     const retry = $('#flight-retry');
 
-    if (emojiEl) emojiEl.textContent = timeup ? '⏰' : '🦊';
+    if (emojiEl) emojiEl.textContent = timeup ? '⏰' : (ko ? '🛟' : '🦊');
     if (title) {
       title.textContent = timeup
         ? "Fly time's up!"
-        : (progressPatch.cleared ? 'Flight complete!' : 'Nice flying, pilot!');
+        : (ko
+          ? 'Limp home — hull empty!'
+          : (progressPatch.cleared ? 'Flight complete!' : 'Nice flying, pilot!'));
     }
     if (body) {
       body.textContent =
-        `${world().emoji} ${world().name} · Score ${score} · Hits ${collected.kills} · Stars ${collected.stars}` +
+        `${world().emoji} ${world().name} · ${waveDef(currentWaveIdx).title} · Score ${score} · Hits ${collected.kills} · Stars ${collected.stars}` +
         ` · 🪙 +${pointsGained} hangar points` +
         (progressPatch.unlockWorld != null ? ' · New world unlocked!' : '') +
-        (timeup ? ' · Session saved.' : '');
+        (timeup ? ' · Session saved.' : '') +
+        (ko ? ' · Brief invuln on hits — try again!' : '');
     }
     if (starsEl) starsEl.textContent = '⭐'.repeat(earned) || '💫';
 
     if (gate) gate.classList.toggle('hidden', !timeup);
     if (retry) {
       retry.classList.toggle('hidden', !!timeup);
-      retry.textContent = '🚀 Fly again';
+      retry.textContent = ko ? '🚀 Try again' : '🚀 Fly again';
     }
 
-    if (global.KidsAudio && success && KidsAudio.win) KidsAudio.win();
+    if (global.KidsAudio && success && !ko && KidsAudio.win) KidsAudio.win();
     else if (global.KidsAudio && KidsAudio.correct) KidsAudio.correct();
 
     if (hooks.onComplete) hooks.onComplete(progressPatch);
@@ -1618,7 +1906,9 @@
     setPrompt(
       timeup
         ? `Fly time's up! Answer ${QUESTIONS_TO_UNLOCK} questions in Science (or Math / Reading / Spelling) to unlock more flight.`
-        : `Great run! +${pointsGained} points — spend them in the hangar!`
+        : (ko
+          ? `Hull empty at ${waveDef(currentWaveIdx).title}. Score saved — launch again when ready!`
+          : `Great run! +${pointsGained} points — spend them in the hangar!`)
     );
   }
 

@@ -2289,6 +2289,54 @@ code {
   color: #6c5ce7;
   font-style: italic;
 }
+.flight-wave-hud {
+  font-weight: 900;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 2px solid #55efc4;
+  background: #55efc4;
+  color: #2d3436;
+  font-variant-numeric: tabular-nums;
+}
+.flight-hp-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #2d3436;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 2px solid #ff7675;
+}
+.flight-hp-label {
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  min-width: 4.2em;
+}
+.flight-hp-bar {
+  display: inline-block;
+  width: 88px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.2);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.35);
+}
+.flight-hp-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #00b894, #55efc4);
+  transition: width 0.2s ease;
+}
+.flight-hp-fill.mid {
+  background: linear-gradient(90deg, #fdcb6e, #ffeaa7);
+}
+.flight-hp-fill.low {
+  background: linear-gradient(90deg, #d63031, #ff7675);
+  animation: flight-pulse 0.8s ease-in-out infinite;
+}
 
 .flight-controls {
   margin-top: 12px;
