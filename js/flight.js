@@ -708,8 +708,11 @@
     }
     const startBtn = $('#flight-start-flight');
     if (startBtn) {
-      startBtn.disabled = false;
-      startBtn.classList.add('ready');
+      const locked = isLocked();
+      startBtn.disabled = locked;
+      startBtn.classList.toggle('ready', !locked);
+      if (locked) startBtn.title = 'Flight locked — get 10 correct answers first';
+      else startBtn.removeAttribute('title');
     }
   }
 
@@ -862,6 +865,10 @@
   }
 
   function beginFlight() {
+    if (isLocked()) {
+      renderMenu();
+      return;
+    }
     showPanel('fly');
     const canvas = $('#flight-fly-canvas');
     if (!canvas) return;
@@ -2301,6 +2308,19 @@
       retry.textContent = ko ? '🚀 Try again' : '🚀 Fly again';
     }
 
+    // Timer expiry: persist lock immediately (same channel as hangar saves).
+    // Limp-home (ko) must NOT lock — only timeup does.
+    if (timeup) {
+      saveProgressPatch({ flightLocked: true, questionsTowardUnlock: 0 });
+      const gateMsg = $('#flight-results-gate-msg');
+      if (gateMsg) {
+        gateMsg.textContent =
+          `Get ${QUESTIONS_TO_UNLOCK} questions correct in Science (or Math / Reading / Spelling) to unlock more flight. Only correct answers count!`;
+      }
+      const gateProg = $('#flight-results-gate-progress');
+      if (gateProg) gateProg.textContent = `Correct: 0/${QUESTIONS_TO_UNLOCK}`;
+    }
+
     if (global.KidsAudio && success && !ko && KidsAudio.win) KidsAudio.win();
     else if (global.KidsAudio && KidsAudio.correct) KidsAudio.correct();
 
@@ -2410,6 +2430,7 @@
     });
     $('#flight-again')?.addEventListener('click', () => {
       if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+      // Always go to menu — renderMenu enforces lock (worlds disabled + banner).
       renderMenu();
     });
     bindPad();
@@ -2458,7 +2479,20 @@
     if (mode === 'menu') updateLockBanner();
     if (mode === 'results') {
       const gate = $('#flight-results-gate');
-      if (gate) gate.classList.toggle('hidden', !isLocked());
+      const locked = isLocked();
+      if (gate) gate.classList.toggle('hidden', !locked);
+      if (locked) {
+        const done = questionsDone();
+        const gateProg = $('#flight-results-gate-progress');
+        if (gateProg) gateProg.textContent = `Correct: ${done}/${QUESTIONS_TO_UNLOCK}`;
+        const gateMsg = $('#flight-results-gate-msg');
+        if (gateMsg) {
+          gateMsg.textContent =
+            `Get ${QUESTIONS_TO_UNLOCK} questions correct in Science (or Math / Reading / Spelling) to unlock more flight. Only correct answers count! Correct: ${done}/${QUESTIONS_TO_UNLOCK}.`;
+        }
+        const retry = $('#flight-retry');
+        if (retry) retry.classList.add('hidden');
+      }
     }
     updatePointsUi();
   }

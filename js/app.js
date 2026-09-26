@@ -913,9 +913,14 @@
     if (mathAdvanceTimer) { clearTimeout(mathAdvanceTimer); mathAdvanceTimer = null; }
     // Manual Next only — give time to review teach visuals / correct answer
     if (res.ok) {
-      $('#math-feedback').textContent = gateLocked
-        ? ('⭐ Yes! ' + flightGateProgressLabel() + ' — tap Next when ready.')
-        : '⭐ Yes! Tap Next when ready.';
+      const stillLocked = isFlightGateLocked();
+      if (gateLocked && !stillLocked) {
+        $('#math-feedback').textContent = '⭐ Yes! Flight unlocked — tap Next when ready.';
+      } else if (gateLocked) {
+        $('#math-feedback').textContent = '⭐ Yes! ' + flightGateProgressLabel() + ' — tap Next when ready.';
+      } else {
+        $('#math-feedback').textContent = '⭐ Yes! Tap Next when ready.';
+      }
     } else if (gateLocked) {
       $('#math-feedback').textContent = 'Try again — only correct answers count! (' + flightGateProgressLabel() + ') Tap Next to retry.';
     } else {
@@ -1149,9 +1154,14 @@
       }
     }
     if (res.ok) {
-      $('#reading-feedback').textContent = gateLocked
-        ? ('⭐ Yes! ' + flightGateProgressLabel())
-        : '⭐ Yes!';
+      const stillLocked = isFlightGateLocked();
+      if (gateLocked && !stillLocked) {
+        $('#reading-feedback').textContent = '⭐ Yes! Flight unlocked!';
+      } else if (gateLocked) {
+        $('#reading-feedback').textContent = '⭐ Yes! ' + flightGateProgressLabel();
+      } else {
+        $('#reading-feedback').textContent = '⭐ Yes!';
+      }
       $('#reading-feedback').className = 'feedback ok';
     } else if (gateLocked) {
       readingGateRetry = true;
@@ -1440,9 +1450,14 @@
       }
     }
     if (res.ok) {
-      $('#science-feedback').textContent = gateLocked
-        ? ('⭐ Cool! ' + flightGateProgressLabel())
-        : '⭐ Cool!';
+      const stillLocked = isFlightGateLocked();
+      if (gateLocked && !stillLocked) {
+        $('#science-feedback').textContent = '⭐ Cool! Flight unlocked!';
+      } else if (gateLocked) {
+        $('#science-feedback').textContent = '⭐ Cool! ' + flightGateProgressLabel();
+      } else {
+        $('#science-feedback').textContent = '⭐ Cool!';
+      }
       $('#science-feedback').className = 'feedback ok';
     } else if (gateLocked) {
       scienceGateRetry = true;
@@ -2131,7 +2146,17 @@
       getProgress: () => ensureFlightProgress(profile().flight),
       saveProgress: (next) => {
         const fp = ensureFlightProgress(profile().flight);
+        const wasLocked = !!fp.flightLocked;
+        const prevQ = Math.max(0, Number(fp.questionsTowardUnlock) || 0);
         Object.assign(fp, next || {});
+        // Hangar / loadout patches must never clear an active flight lock.
+        // Only applyFlightGateAnswer (10 correct) unlocks.
+        if (wasLocked && !fp.flightLocked) {
+          fp.flightLocked = true;
+          if (typeof (next || {}).questionsTowardUnlock !== 'number') {
+            fp.questionsTowardUnlock = prevQ;
+          }
+        }
         if (!Array.isArray(fp.ownedShips)) fp.ownedShips = ['scout', 'zippy', 'foxjet'];
         if (!Array.isArray(fp.ownedPerks)) fp.ownedPerks = [];
         if (!fp.weaponLevels || typeof fp.weaponLevels !== 'object') {
@@ -2169,7 +2194,9 @@
         }
         if (result.shipId) fp.lastShipId = result.shipId;
         if (result.upgrades) fp.lastUpgrades = Object.assign({}, result.upgrades);
-        if (result.lockFlight) {
+        // Session timer expiry locks flight until 10 correct answers.
+        // lockFlight and timeup both mean the gate — ko/limp-home must not lock.
+        if (result.lockFlight || result.timeup) {
           fp.flightLocked = true;
           fp.questionsTowardUnlock = 0;
         }

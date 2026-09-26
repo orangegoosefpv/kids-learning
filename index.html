@@ -535,7 +535,8 @@
           <div id="flight-results-stars" class="stars-big">⭐</div>
           <p id="flight-results-body"></p>
           <div id="flight-results-gate" class="flight-results-gate hidden">
-            <p class="flight-lock-msg">Get 10 questions correct in Science (or Math / Reading / Spelling) to unlock more flight. Only correct answers count!</p>
+            <p id="flight-results-gate-msg" class="flight-lock-msg">Get 10 questions correct in Science (or Math / Reading / Spelling) to unlock more flight. Only correct answers count!</p>
+            <div id="flight-results-gate-progress" class="flight-lock-progress" aria-label="Correct answers toward unlock">Correct: 0/10</div>
             <div class="flight-lock-links">
               <button type="button" class="btn btn-lg btn-primary" data-flight-subject="science">🔬 Science</button>
               <button type="button" class="btn btn-lg" data-flight-subject="math">🔢 Math</button>
@@ -609,7 +610,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/vendor/xlsx.full.min.js"></script>
-  <script src="js/storage.js"></script>
+  <script src="js/storage.js?v=20260926-flightlock"></script>
   <script src="js/tracker.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/typing.js"></script>
@@ -619,7 +620,7 @@
   <script src="js/science.js"></script>
   <script src="js/stem.js"></script>
   <script src="js/chess.js"></script>
-  <script src="js/flight.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/flight.js?v=20260926-flightlock"></script>
+  <script src="js/app.js?v=20260926-flightlock"></script>
 </body>
 </html>
