@@ -19,6 +19,51 @@
     }
   }
 
+  const FLIGHT_GATE_SUBJECTS = ['Math', 'Reading', 'Spelling', 'Science'];
+
+  function ensureFlightProgress(fp) {
+    const base = fp && typeof fp === 'object' ? fp : {};
+    if (!Array.isArray(base.unlockedWorlds)) base.unlockedWorlds = [0];
+    if (!base.unlockedWorlds.includes(0)) base.unlockedWorlds.push(0);
+    if (typeof base.completed !== 'number') base.completed = 0;
+    if (typeof base.bestScore !== 'number') base.bestScore = 0;
+    if (typeof base.questionsTowardUnlock !== 'number') base.questionsTowardUnlock = 0;
+    if (typeof base.flightLocked !== 'boolean') base.flightLocked = !!base.flightLocked;
+    if (!base.lastShipId) base.lastShipId = 'foxjet';
+    if (!base.lastUpgrades || typeof base.lastUpgrades !== 'object') {
+      base.lastUpgrades = { speed: false, fire: false, shield: false };
+    }
+    return base;
+  }
+
+  function applyFlightGateAnswer(section) {
+    const name = String(section || '');
+    const matched = FLIGHT_GATE_SUBJECTS.some(s => s.toLowerCase() === name.toLowerCase());
+    if (!matched) return null;
+    const p = profile();
+    const fp = ensureFlightProgress(p.flight);
+    if (!fp.flightLocked) {
+      p.flight = fp;
+      return null;
+    }
+    fp.questionsTowardUnlock = Math.min(
+      10,
+      (fp.questionsTowardUnlock || 0) + 1
+    );
+    let unlocked = false;
+    if (fp.questionsTowardUnlock >= 10) {
+      fp.flightLocked = false;
+      fp.questionsTowardUnlock = 0;
+      unlocked = true;
+    }
+    p.flight = fp;
+    persist();
+    updateChrome();
+    refreshHubStats();
+    if (window.FlightGame && FlightGame.refreshLockUi) FlightGame.refreshLockUi();
+    return { questionsTowardUnlock: fp.questionsTowardUnlock, unlocked: unlocked, locked: fp.flightLocked };
+  }
+
   function trackAnswer(section, prompt, correct, detail) {
     const child = profile().name || 'Unknown';
     KidsStorage.logAnswer({
@@ -28,6 +73,8 @@
       correct: !!correct,
       detail: detail || ''
     });
+    // Count answer submissions toward Space Fox Flyer unlock gate (while locked)
+    applyFlightGateAnswer(section);
     if (KidsStorage.isHousehold(state)) persist();
     updateTrackerCount();
     // Quiet rewrite of linked Excel when File System Access is available
@@ -159,7 +206,7 @@
       <div class="stat-pill">🔢 Math best: <span>${p.math[kidGrade()] || 0}</span></div>
       <div class="stat-pill">🐵 Monkey Code: <span>${stemDone}/12</span></div>
       <div class="stat-pill">♟️ Chess: <span>${(p.chess && p.chess.completed) || 0}</span></div>
-      <div class="stat-pill">✈️ Flyer: <span>${(p.flight && p.flight.completed) || 0}</span> · best ${ (p.flight && p.flight.bestScore) || 0 }</div>
+      <div class="stat-pill">✈️ Flyer: <span>${(p.flight && p.flight.completed) || 0}</span> · best ${ (p.flight && p.flight.bestScore) || 0 }${(p.flight && p.flight.flightLocked) ? ' · 🔒 ' + ((p.flight.questionsTowardUnlock || 0)) + '/10' : ''}</div>
     `;
     renderJourneyMap(p);
     updateTrackerCount();
@@ -1985,24 +2032,36 @@
     const speak = $('#flight-speak');
     if (speak) speak.title = kidGrade() === 'grade2' ? 'Read to me' : 'Read aloud';
     const p = profile();
-    if (!p.flight) p.flight = { completed: 0, bestScore: 0, unlockedWorlds: [0] };
-    if (!Array.isArray(p.flight.unlockedWorlds)) p.flight.unlockedWorlds = [0];
+    p.flight = ensureFlightProgress(p.flight);
 
     FlightGame.start(kidGrade(), {
-      getProgress: () => profile().flight || { completed: 0, bestScore: 0, unlockedWorlds: [0] },
+      getProgress: () => ensureFlightProgress(profile().flight),
       onPrompt: (text) => {
         setReadAloud(text || '', { auto: isPrek() });
       },
+      onOpenSubject: (subject) => {
+        const key = String(subject || '').toLowerCase();
+        KidsAudio.click && KidsAudio.click();
+        if (window.FlightGame && FlightGame.stop) FlightGame.stop();
+        if (key === 'math') openMath();
+        else if (key === 'reading') openReading();
+        else if (key === 'spelling') openSpelling();
+        else openScience();
+      },
       onComplete: (result) => {
-        const fp = profile().flight || { completed: 0, bestScore: 0, unlockedWorlds: [0] };
+        const fp = ensureFlightProgress(profile().flight);
         if (result.completedDelta) fp.completed = (fp.completed || 0) + result.completedDelta;
         if (typeof result.score === 'number' && result.score > (fp.bestScore || 0)) {
           fp.bestScore = result.score;
         }
-        if (!Array.isArray(fp.unlockedWorlds)) fp.unlockedWorlds = [0];
-        if (!fp.unlockedWorlds.includes(0)) fp.unlockedWorlds.push(0);
         if (result.unlockWorld != null && !fp.unlockedWorlds.includes(result.unlockWorld)) {
           fp.unlockedWorlds.push(result.unlockWorld);
+        }
+        if (result.shipId) fp.lastShipId = result.shipId;
+        if (result.upgrades) fp.lastUpgrades = Object.assign({}, result.upgrades);
+        if (result.lockFlight) {
+          fp.flightLocked = true;
+          fp.questionsTowardUnlock = 0;
         }
         profile().flight = fp;
         const stars = result.starsEarned || 0;
@@ -2010,12 +2069,17 @@
         persist();
         updateChrome();
         refreshHubStats();
-        trackAnswer(
-          'flight',
-          `${(FlightGame.WORLDS[result.worldId] || {}).name || 'World'} flight`,
-          !!result.cleared,
-          `score=${result.score};rings=${result.rings};stars=${result.stars}`
-        );
+        // Log flight run (does not count toward unlock gate)
+        const child = profile().name || 'Unknown';
+        KidsStorage.logAnswer({
+          child: child,
+          subject: 'flight',
+          prompt: `${(FlightGame.WORLDS[result.worldId] || {}).name || 'World'} flight`,
+          correct: !!result.cleared,
+          detail: `score=${result.score};kills=${result.kills || result.rings};stars=${result.stars};timeup=${!!result.timeup}`
+        });
+        if (KidsStorage.isHousehold(state)) persist();
+        updateTrackerCount();
         confettiBurst();
       }
     });

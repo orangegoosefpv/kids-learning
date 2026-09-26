@@ -1,140 +1,190 @@
-/* Space Fox Flyer — build a plane, pull-back launch, fly & collect stars
+/* Space Fox Flyer — top-down arena shooter
+   Pick a ship + boosts, 7-min timed flights, soft targets (no gore).
    Original kid-friendly game (emoji/canvas art). No third-party IP assets. */
 (function (global) {
+  const SESSION_SECONDS = 7 * 60;
+  const QUESTIONS_TO_UNLOCK = 10;
+  const GATE_SUBJECTS = ['Math', 'Reading', 'Spelling', 'Science'];
+
   const WORLDS = [
     {
       id: 0,
       key: 'meadow',
       name: 'Meadow Skies',
       emoji: '🌿',
-      tip: 'Soft green hills and shiny rings!',
+      tip: 'Soft hills · blast floaty drones!',
       skyTop: '#87CEEB',
       skyBot: '#c8f0a8',
       ground: '#5cb85c',
       accent: '#ffd93d',
-      length: 4200,
-      rings: 8,
-      stars: 5,
-      obstacles: 4,
-      obstacleEmoji: '☁️',
-      collectRing: '⭕',
-      collectStar: '⭐',
-      bgBits: ['🌳', '🌼', '🏡']
+      arena: 1600,
+      enemies: 8,
+      asteroids: 5,
+      stars: 6,
+      enemyEmoji: '🛸',
+      rockEmoji: '☁️',
+      starEmoji: '⭐',
+      bgBits: ['🌳', '🌼', '🏡', '🦋']
     },
     {
       id: 1,
       key: 'rocks',
       name: 'Rock Belt',
       emoji: '☄️',
-      tip: 'Dodge soft space rocks and grab stars!',
+      tip: 'Zap soft space rocks and grab stars!',
       skyTop: '#1a1033',
       skyBot: '#3d2b6b',
       ground: '#2a1a4a',
       accent: '#ff9f43',
-      length: 4800,
-      rings: 7,
-      stars: 7,
-      obstacles: 7,
-      obstacleEmoji: '🌑',
-      collectRing: '💠',
-      collectStar: '⭐',
-      bgBits: ['✨', '🪐', '💫']
+      arena: 1800,
+      enemies: 10,
+      asteroids: 8,
+      stars: 8,
+      enemyEmoji: '👾',
+      rockEmoji: '🌑',
+      starEmoji: '⭐',
+      bgBits: ['✨', '🪐', '💫', '🌙']
     },
     {
       id: 2,
       key: 'islands',
       name: 'Sky Islands',
       emoji: '🏝️',
-      tip: 'Float past cloudy islands — do a barrel roll!',
+      tip: 'Island hop · blast balloon drones!',
       skyTop: '#6ec6ff',
       skyBot: '#ffeaa7',
       ground: '#74b9ff',
       accent: '#fd79a8',
-      length: 5000,
-      rings: 9,
-      stars: 6,
-      obstacles: 5,
-      obstacleEmoji: '🪨',
-      collectRing: '💍',
-      collectStar: '🌟',
-      bgBits: ['☁️', '🎈', '🌈']
+      arena: 1700,
+      enemies: 9,
+      asteroids: 6,
+      stars: 7,
+      enemyEmoji: '🎈',
+      rockEmoji: '🪨',
+      starEmoji: '🌟',
+      bgBits: ['☁️', '🌈', '🏝️', '🕊️']
     }
   ];
 
-  const PARTS = [
-    { id: 'fuselage', label: 'Body', emoji: '📦', required: true, slot: 'body' },
-    { id: 'wings', label: 'Wings', emoji: '🪽', required: true, slot: 'wings' },
-    { id: 'engine', label: 'Engine', emoji: '🚀', required: true, slot: 'engine' },
-    { id: 'tail', label: 'Tail', emoji: '🔼', required: false, slot: 'tail' },
-    { id: 'nose', label: 'Nose', emoji: '🔺', required: false, slot: 'nose' },
-    { id: 'decal', label: 'Decal', emoji: '🦊', required: false, slot: 'decal' }
-  ];
-
-  const PRESETS = [
+  const SHIPS = [
     {
       id: 'scout',
       name: 'Scout Flutter',
       emoji: '🛩️',
-      parts: { body: 'fuselage', wings: 'wings', engine: 'engine', tail: 'tail', nose: null, decal: 'decal' }
+      color: '#74b9ff',
+      tip: 'Easy turns · great starter',
+      turn: 1.12,
+      thrust: 0.95,
+      fire: 1
     },
     {
       id: 'zippy',
       name: 'Zippy Dart',
       emoji: '✈️',
-      parts: { body: 'fuselage', wings: 'wings', engine: 'engine', tail: null, nose: 'nose', decal: null }
+      color: '#fd79a8',
+      tip: 'Speedy · zip around!',
+      turn: 1,
+      thrust: 1.2,
+      fire: 1.05
     },
     {
       id: 'foxjet',
       name: 'Fox Jet',
       emoji: '🦊',
-      parts: { body: 'fuselage', wings: 'wings', engine: 'engine', tail: 'tail', nose: 'nose', decal: 'decal' }
+      color: '#ff9f43',
+      tip: 'Fox power · balanced blast',
+      turn: 1.05,
+      thrust: 1.05,
+      fire: 1.15
     }
+  ];
+
+  const UPGRADES = [
+    { id: 'speed', label: 'Speed', emoji: '⚡', tip: 'Zoom faster' },
+    { id: 'fire', label: 'Fire rate', emoji: '🔥', tip: 'Shoot quicker' },
+    { id: 'shield', label: 'Shield', emoji: '🛡️', tip: 'Extra soft bump buffer' }
   ];
 
   let grade = 'grade2';
   let hooks = {};
-  let mode = 'menu'; // menu | build | launch | fly | results
+  let mode = 'menu'; // menu | build | countdown | fly | results
   let worldIdx = 0;
-  let placed = {}; // slot -> partId
-  let dragPart = null;
+  let shipId = 'foxjet';
+  let upgrades = { speed: false, fire: false, shield: false };
   let raf = 0;
   let keys = {};
-  let pad = { up: false, down: false, left: false, right: false };
+  let pad = { up: false, down: false, left: false, right: false, fire: false };
   let plane = null;
+  let bullets = [];
   let entities = [];
+  let particles = [];
   let score = 0;
-  let collected = { rings: 0, stars: 0 };
+  let collected = { stars: 0, kills: 0 };
   let flightDone = false;
   let flavor = '';
-  let launch = { pulling: false, ox: 0, oy: 0, dx: 0, dy: 0, power: 0, angle: 0 };
   let bound = false;
+  let sessionLeft = SESSION_SECONDS;
+  let sessionStartedAt = 0;
+  let fireCooldown = 0;
+  let countdownTimer = 0;
+  let lastTs = 0;
+  let cam = { x: 0, y: 0 };
+  let fireHeld = false;
 
   function $(sel, root) {
     return (root || document).querySelector(sel);
+  }
+
+  function $$(sel, root) {
+    return Array.from((root || document).querySelectorAll(sel));
   }
 
   function world() {
     return WORLDS[worldIdx] || WORLDS[0];
   }
 
+  function ship() {
+    return SHIPS.find(s => s.id === shipId) || SHIPS[2];
+  }
+
   function isPrek() { return grade === 'prek'; }
 
   function difficulty() {
     if (grade === 'prek') {
-      return { speed: 2.2, gravity: 0.08, lift: 0.22, obstacleSlow: 0.55, hitPadding: 18, targetStars: 2 };
+      return { thrust: 0.22, turn: 0.08, maxSpeed: 4.2, fireMs: 320, bulletSpeed: 9, enemySpeed: 0.9, hitPad: 10 };
     }
     if (grade === 'grade3') {
-      return { speed: 3.4, gravity: 0.12, lift: 0.28, obstacleSlow: 0.7, hitPadding: 8, targetStars: 4 };
+      return { thrust: 0.28, turn: 0.1, maxSpeed: 5.6, fireMs: 220, bulletSpeed: 11, enemySpeed: 1.5, hitPad: 4 };
     }
-    return { speed: 2.8, gravity: 0.1, lift: 0.25, obstacleSlow: 0.65, hitPadding: 12, targetStars: 3 };
+    return { thrust: 0.25, turn: 0.09, maxSpeed: 5, fireMs: 260, bulletSpeed: 10, enemySpeed: 1.2, hitPad: 6 };
   }
 
-  function requiredReady() {
-    return !!(placed.body && placed.wings && placed.engine);
+  function upgradeCount() {
+    return (upgrades.speed ? 1 : 0) + (upgrades.fire ? 1 : 0) + (upgrades.shield ? 1 : 0);
   }
 
-  function partById(id) {
-    return PARTS.find(p => p.id === id);
+  function progress() {
+    return (hooks.getProgress && hooks.getProgress()) || defaultProgress();
+  }
+
+  function defaultProgress() {
+    return {
+      completed: 0,
+      bestScore: 0,
+      unlockedWorlds: [0],
+      questionsTowardUnlock: 0,
+      flightLocked: false,
+      lastShipId: 'foxjet',
+      lastUpgrades: { speed: false, fire: false, shield: false }
+    };
+  }
+
+  function isLocked() {
+    return !!(progress().flightLocked);
+  }
+
+  function questionsDone() {
+    return Math.max(0, Math.min(QUESTIONS_TO_UNLOCK, Number(progress().questionsTowardUnlock) || 0));
   }
 
   function setPrompt(text) {
@@ -144,7 +194,7 @@
   }
 
   function showPanel(name) {
-    ['menu', 'build', 'launch', 'fly', 'results'].forEach(m => {
+    ['menu', 'build', 'countdown', 'fly', 'results'].forEach(m => {
       const el = $('#flight-panel-' + m);
       if (el) el.classList.toggle('hidden', m !== name);
     });
@@ -156,27 +206,64 @@
       cancelAnimationFrame(raf);
       raf = 0;
     }
+    if (countdownTimer) {
+      clearTimeout(countdownTimer);
+      countdownTimer = 0;
+    }
   }
 
   function unlockedSet() {
-    const prog = (hooks.getProgress && hooks.getProgress()) || { unlockedWorlds: [0] };
+    const prog = progress();
     const arr = Array.isArray(prog.unlockedWorlds) ? prog.unlockedWorlds.slice() : [0];
     if (!arr.includes(0)) arr.push(0);
     return new Set(arr);
   }
 
+  function formatTime(sec) {
+    const s = Math.max(0, Math.ceil(sec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + ':' + String(r).padStart(2, '0');
+  }
+
+  function updateLockBanner() {
+    const banner = $('#flight-lock-banner');
+    if (!banner) return;
+    const locked = isLocked();
+    banner.classList.toggle('hidden', !locked);
+    const done = questionsDone();
+    const msg = $('#flight-lock-msg');
+    if (msg) {
+      msg.textContent = locked
+        ? `Answer ${QUESTIONS_TO_UNLOCK} questions in Science (or Math / Reading / Spelling) to unlock more flight. Progress: ${done} / ${QUESTIONS_TO_UNLOCK}.`
+        : '';
+    }
+    const progEl = $('#flight-lock-progress');
+    if (progEl) {
+      progEl.textContent = `${done} / ${QUESTIONS_TO_UNLOCK}`;
+      progEl.style.setProperty('--pct', String((done / QUESTIONS_TO_UNLOCK) * 100));
+    }
+    const worlds = $('#flight-worlds');
+    if (worlds) worlds.classList.toggle('flight-worlds-locked', locked);
+  }
+
   function renderMenu() {
     showPanel('menu');
     stopLoop();
+    updateLockBanner();
     const unlocked = unlockedSet();
+    const locked = isLocked();
     const grid = $('#flight-worlds');
     if (!grid) return;
     grid.innerHTML = WORLDS.map(w => {
-      const open = unlocked.has(w.id);
+      const open = unlocked.has(w.id) && !locked;
+      const hint = locked
+        ? 'Finish 10 questions to fly again!'
+        : (unlocked.has(w.id) ? w.tip : 'Finish a flight to unlock!');
       return `<button type="button" class="btn btn-xl flight-world-btn ${open ? '' : 'locked'}" data-world="${w.id}" ${open ? '' : 'disabled'} aria-label="${w.name}">
         <span class="emoji">${w.emoji}</span>
         <span class="label">${w.name}</span>
-        <span class="hint">${open ? w.tip : 'Finish a flight to unlock!'}</span>
+        <span class="hint">${hint}</span>
       </button>`;
     }).join('');
     grid.querySelectorAll('[data-world]').forEach(btn => {
@@ -187,233 +274,125 @@
         startBuild();
       });
     });
-    const tip = isPrek()
-      ? 'Pick a sky world, build a plane, pull back, and fly!'
-      : 'Choose a world · build your flyer · pull back · collect rings & stars!';
+    const tip = locked
+      ? `Fly time's up! Answer ${QUESTIONS_TO_UNLOCK} questions (Science / Math / Reading / Spelling) to unlock more flight.`
+      : (isPrek()
+        ? 'Pick a world, choose a ship, then blast soft targets!'
+        : 'Top-down flyer · pick a ship · blast drones & rocks · 7 minutes!');
     setPrompt(tip);
     const badge = $('#flight-grade-tip');
     if (badge) {
       badge.classList.toggle('hidden', grade !== 'grade2');
-      badge.textContent = '📗 Grade 2 favorite — build, launch, and barrel-roll flavor awaits!';
+      badge.textContent = '📗 Grade 2 favorite — top-down fox flyer with blasters!';
     }
   }
 
   function startBuild() {
-    placed = {};
+    if (isLocked()) {
+      renderMenu();
+      return;
+    }
+    const prog = progress();
+    if (prog.lastShipId && SHIPS.some(s => s.id === prog.lastShipId)) shipId = prog.lastShipId;
+    const lu = prog.lastUpgrades || {};
+    upgrades = {
+      speed: !!lu.speed,
+      fire: !!lu.fire,
+      shield: !!lu.shield
+    };
+    // Cap to 2 if somehow more
+    while (upgradeCount() > 2) {
+      if (upgrades.shield) upgrades.shield = false;
+      else if (upgrades.fire) upgrades.fire = false;
+      else upgrades.speed = false;
+    }
     showPanel('build');
     stopLoop();
     const w = world();
-    setPrompt(`${w.emoji} ${w.name}: drag parts onto the pad. Need body + wings + engine!`);
-    renderPartsTray();
-    renderBuildPad();
-    renderPresets();
-    updateStartFlightBtn();
+    setPrompt(`${w.emoji} ${w.name}: pick a ship and up to 2 boosts, then Launch!`);
+    renderShips();
+    renderUpgrades();
+    updateLoadoutSummary();
   }
 
-  function renderPartsTray() {
-    const tray = $('#flight-parts');
-    if (!tray) return;
-    tray.innerHTML = PARTS.map(p =>
-      `<button type="button" class="flight-part" draggable="true" data-part="${p.id}" aria-label="${p.label}">
-        <span class="flight-part-emoji">${p.emoji}</span>
-        <span class="flight-part-label">${p.label}${p.required ? ' ★' : ''}</span>
+  function renderShips() {
+    const row = $('#flight-ships');
+    if (!row) return;
+    row.innerHTML = SHIPS.map(s =>
+      `<button type="button" class="flight-ship-btn ${s.id === shipId ? 'selected' : ''}" data-ship="${s.id}" aria-pressed="${s.id === shipId}">
+        <span class="flight-ship-emoji">${s.emoji}</span>
+        <span class="flight-ship-name">${s.name}</span>
+        <span class="flight-ship-tip">${s.tip}</span>
       </button>`
     ).join('');
-    tray.querySelectorAll('.flight-part').forEach(el => {
-      el.addEventListener('dragstart', onPartDragStart);
-      el.addEventListener('touchstart', onPartTouchStart, { passive: false });
-      el.addEventListener('click', () => {
-        // Tap-to-place for mobile: place into first empty matching slot
-        const part = partById(el.dataset.part);
-        if (!part) return;
-        if (!placed[part.slot]) {
-          placed[part.slot] = part.id;
-          if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
-          renderBuildPad();
-          updateStartFlightBtn();
-          flashSlot(part.slot);
-        }
-      });
-    });
-  }
-
-  function renderPresets() {
-    const row = $('#flight-presets');
-    if (!row) return;
-    row.innerHTML = PRESETS.map(pr =>
-      `<button type="button" class="btn btn-sm flight-preset-btn" data-preset="${pr.id}">${pr.emoji} ${pr.name}</button>`
-    ).join('');
-    row.querySelectorAll('[data-preset]').forEach(btn => {
+    row.querySelectorAll('[data-ship]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const pr = PRESETS.find(p => p.id === btn.dataset.preset);
-        if (!pr) return;
-        placed = {};
-        Object.keys(pr.parts).forEach(slot => {
-          if (pr.parts[slot]) placed[slot] = pr.parts[slot];
-        });
-        if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
-        renderBuildPad();
-        updateStartFlightBtn();
-        setPrompt(`Preset ready: ${pr.name}! Tap Start flight when you like it.`);
+        shipId = btn.dataset.ship;
+        if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+        renderShips();
+        updateLoadoutSummary();
       });
     });
   }
 
-  function renderBuildPad() {
-    const padEl = $('#flight-build-pad');
-    if (!padEl) return;
-    const slots = [
-      { id: 'nose', label: 'Nose' },
-      { id: 'body', label: 'Body' },
-      { id: 'wings', label: 'Wings' },
-      { id: 'engine', label: 'Engine' },
-      { id: 'tail', label: 'Tail' },
-      { id: 'decal', label: 'Decal' }
-    ];
-    padEl.innerHTML = slots.map(s => {
-      const pid = placed[s.id];
-      const part = pid ? partById(pid) : null;
-      return `<div class="flight-slot ${part ? 'filled' : ''}" data-slot="${s.id}" data-label="${s.label}">
-        <span class="flight-slot-label">${s.label}</span>
-        <span class="flight-slot-emoji">${part ? part.emoji : '➕'}</span>
-      </div>`;
+  function renderUpgrades() {
+    const row = $('#flight-upgrades');
+    if (!row) return;
+    row.innerHTML = UPGRADES.map(u => {
+      const on = !!upgrades[u.id];
+      return `<button type="button" class="flight-upgrade-btn ${on ? 'selected' : ''}" data-upgrade="${u.id}" aria-pressed="${on}">
+        <span class="flight-upgrade-emoji">${u.emoji}</span>
+        <span class="flight-upgrade-name">${u.label}</span>
+        <span class="flight-upgrade-tip">${u.tip}</span>
+      </button>`;
     }).join('');
-    padEl.querySelectorAll('.flight-slot').forEach(slot => {
-      slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('drag-over'); });
-      slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
-      slot.addEventListener('drop', e => {
-        e.preventDefault();
-        slot.classList.remove('drag-over');
-        const partId = e.dataTransfer.getData('text/part') || dragPart;
-        placePart(partId, slot.dataset.slot);
-      });
-      slot.addEventListener('click', () => {
-        // Clear optional or swap
-        if (placed[slot.dataset.slot]) {
-          delete placed[slot.dataset.slot];
-          renderBuildPad();
-          updateStartFlightBtn();
+    row.querySelectorAll('[data-upgrade]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.upgrade;
+        if (upgrades[id]) {
+          upgrades[id] = false;
+        } else if (upgradeCount() < 2) {
+          upgrades[id] = true;
+        } else {
+          setPrompt('Pick only 2 boosts — tap one to turn it off first!');
+          if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
+          return;
         }
+        if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+        renderUpgrades();
+        updateLoadoutSummary();
       });
     });
-    updatePlanePreview();
   }
 
-  function placePart(partId, slotId) {
-    const part = partById(partId);
-    if (!part) return;
-    // Snap to the part's intended slot if dropping on wrong one
-    const target = part.slot === slotId ? slotId : part.slot;
-    placed[target] = part.id;
-    if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
-    renderBuildPad();
-    updateStartFlightBtn();
-    flashSlot(target);
-  }
-
-  function flashSlot(slotId) {
-    const el = $(`.flight-slot[data-slot="${slotId}"]`);
-    if (!el) return;
-    el.classList.add('just-placed');
-    setTimeout(() => el.classList.remove('just-placed'), 450);
-  }
-
-  function updateStartFlightBtn() {
-    const btn = $('#flight-start-flight');
-    if (!btn) return;
-    const ok = requiredReady();
-    btn.disabled = !ok;
-    btn.classList.toggle('ready', ok);
+  function updateLoadoutSummary() {
+    const s = ship();
+    const boosts = UPGRADES.filter(u => upgrades[u.id]).map(u => u.emoji + ' ' + u.label);
+    const preview = $('#flight-plane-preview');
+    if (preview) preview.textContent = s.emoji + (boosts.length ? ' ' + boosts.map(b => b.split(' ')[0]).join('') : '');
+    const sum = $('#flight-loadout-summary');
+    if (sum) {
+      sum.textContent = boosts.length
+        ? `${s.name} · ${boosts.join(' · ')}`
+        : `${s.name} · no boosts (still fun!)`;
+    }
     const status = $('#flight-build-status');
     if (status) {
-      status.textContent = ok
-        ? '✅ Ready for launch!'
-        : 'Need: body + wings + engine';
+      status.textContent = boosts.length
+        ? `✅ ${s.name} + ${boosts.length} boost${boosts.length > 1 ? 's' : ''}`
+        : `✅ ${s.name} ready — boosts optional`;
     }
-  }
-
-  function updatePlanePreview() {
-    const el = $('#flight-plane-preview');
-    if (!el) return;
-    const order = ['nose', 'body', 'wings', 'engine', 'tail', 'decal'];
-    el.innerHTML = order.map(s => {
-      const pid = placed[s];
-      const part = pid ? partById(pid) : null;
-      return part ? `<span class="pv-part pv-${s}">${part.emoji}</span>` : '';
-    }).join('') || '<span class="pv-empty">Build me!</span>';
-  }
-
-  function onPartDragStart(e) {
-    dragPart = e.currentTarget.dataset.part;
-    e.dataTransfer.setData('text/part', dragPart);
-    e.dataTransfer.effectAllowed = 'copy';
-  }
-
-  let touchGhost = null;
-  function onPartTouchStart(e) {
-    const partId = e.currentTarget.dataset.part;
-    dragPart = partId;
-    const touch = e.touches[0];
-    if (!touch) return;
-    e.preventDefault();
-    touchGhost = document.createElement('div');
-    touchGhost.className = 'flight-touch-ghost';
-    touchGhost.textContent = partById(partId).emoji;
-    document.body.appendChild(touchGhost);
-    moveGhost(touch.clientX, touch.clientY);
-    const move = (ev) => {
-      const t = ev.touches[0];
-      if (t) moveGhost(t.clientX, t.clientY);
-    };
-    const end = (ev) => {
-      document.removeEventListener('touchmove', move);
-      document.removeEventListener('touchend', end);
-      if (touchGhost) { touchGhost.remove(); touchGhost = null; }
-      const t = ev.changedTouches[0];
-      if (!t) return;
-      const under = document.elementFromPoint(t.clientX, t.clientY);
-      const slot = under && under.closest && under.closest('.flight-slot');
-      if (slot) placePart(partId, slot.dataset.slot);
-      else {
-        // Drop near pad → auto place intended slot
-        const padEl = $('#flight-build-pad');
-        if (padEl) {
-          const r = padEl.getBoundingClientRect();
-          if (t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom) {
-            const part = partById(partId);
-            if (part) placePart(partId, part.slot);
-          }
-        }
-      }
-    };
-    document.addEventListener('touchmove', move, { passive: false });
-    document.addEventListener('touchend', end);
-  }
-
-  function moveGhost(x, y) {
-    if (!touchGhost) return;
-    touchGhost.style.left = x + 'px';
-    touchGhost.style.top = y + 'px';
-  }
-
-  function startLaunch() {
-    if (!requiredReady()) return;
-    showPanel('launch');
-    stopLoop();
-    launch = { pulling: false, ox: 0, oy: 0, dx: 0, dy: 0, power: 0, angle: -0.35 };
-    setPrompt('Pull the plane back like a slingshot, then let go to launch!');
-    const canvas = $('#flight-launch-canvas');
-    if (!canvas) return;
-    sizeCanvas(canvas);
-    drawLaunch(canvas);
-    bindLaunch(canvas);
-    updatePowerMeter(0);
+    const startBtn = $('#flight-start-flight');
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.classList.add('ready');
+    }
   }
 
   function sizeCanvas(canvas) {
     const wrap = canvas.parentElement;
     const w = Math.max(280, Math.min(wrap ? wrap.clientWidth : 640, 720));
-    const h = Math.max(200, Math.round(w * 0.55));
+    const h = Math.max(220, Math.round(w * 0.62));
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
@@ -421,206 +400,92 @@
     canvas.style.height = h + 'px';
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    return { w, h, ctx };
+    return { w, h, ctx, dpr };
   }
 
-  function planeVisual() {
-    return {
-      body: placed.body ? partById(placed.body).emoji : '📦',
-      wings: placed.wings ? partById(placed.wings).emoji : '',
-      engine: placed.engine ? partById(placed.engine).emoji : '',
-      tail: placed.tail ? partById(placed.tail).emoji : '',
-      nose: placed.nose ? partById(placed.nose).emoji : '',
-      decal: placed.decal ? partById(placed.decal).emoji : '🦊'
-    };
-  }
-
-  function drawPlaneEmoji(ctx, x, y, scale, angle) {
-    const v = planeVisual();
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle || 0);
-    ctx.font = `${Math.round(28 * scale)}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    if (v.tail) ctx.fillText(v.tail, -28 * scale, 0);
-    if (v.wings) ctx.fillText(v.wings, 0, -10 * scale);
-    ctx.fillText(v.body, 0, 0);
-    if (v.nose) ctx.fillText(v.nose, 26 * scale, 0);
-    if (v.engine) ctx.fillText(v.engine, -8 * scale, 14 * scale);
-    if (v.decal) {
-      ctx.font = `${Math.round(16 * scale)}px serif`;
-      ctx.fillText(v.decal, 4 * scale, -16 * scale);
+  function beginCountdown() {
+    if (isLocked()) {
+      renderMenu();
+      return;
     }
-    ctx.restore();
-  }
-
-  function drawLaunch(canvas) {
-    const { w, h, ctx } = sizeCanvas(canvas);
-    const wd = world();
-    const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, wd.skyTop);
-    grad.addColorStop(1, wd.skyBot);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = wd.ground;
-    ctx.fillRect(0, h - 36, w, 36);
-
-    const anchorX = w * 0.28;
-    const anchorY = h * 0.55;
-    const px = anchorX + launch.dx;
-    const py = anchorY + launch.dy;
-
-    // Slingshot bands
-    ctx.strokeStyle = 'rgba(80,40,20,0.85)';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(anchorX - 40, anchorY - 30);
-    ctx.lineTo(px, py);
-    ctx.lineTo(anchorX - 40, anchorY + 30);
-    ctx.stroke();
-
-    // Power arc hint
-    if (launch.power > 0.05) {
-      ctx.strokeStyle = 'rgba(255,200,60,0.7)';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([6, 6]);
-      ctx.beginPath();
-      const ang = launch.angle;
-      const pow = launch.power;
-      let lx = px;
-      let ly = py;
-      let vx = Math.cos(ang) * pow * 18;
-      let vy = Math.sin(ang) * pow * 18;
-      ctx.moveTo(lx, ly);
-      for (let i = 0; i < 18; i++) {
-        lx += vx;
-        ly += vy;
-        vy += 0.35;
-        ctx.lineTo(lx, ly);
+    stopLoop();
+    prepareArena();
+    updateHud();
+    setPrompt('Get ready…');
+    showPanel('countdown');
+    const num = $('#flight-countdown-num');
+    const msg = $('#flight-countdown-msg');
+    let cn = 3;
+    const panelTick = () => {
+      if (mode !== 'countdown') return;
+      if (num) {
+        num.textContent = cn > 0 ? String(cn) : 'GO!';
+        num.style.animation = 'none';
+        void num.offsetWidth;
+        num.style.animation = '';
       }
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    drawPlaneEmoji(ctx, px, py, 1.15, launch.angle * 0.4);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.font = 'bold 14px system-ui,sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Grab · pull back · release!', w / 2, 28);
-  }
-
-  function updatePowerMeter(p) {
-    const fill = $('#flight-power-fill');
-    if (fill) fill.style.width = Math.round(Math.max(0, Math.min(1, p)) * 100) + '%';
-    const label = $('#flight-power-label');
-    if (label) {
-      if (p < 0.2) label.textContent = 'Power: soft';
-      else if (p < 0.55) label.textContent = 'Power: good';
-      else if (p < 0.85) label.textContent = 'Power: strong!';
-      else label.textContent = 'Power: MAX! 🚀';
-    }
-  }
-
-  function bindLaunch(canvas) {
-    const getPos = (e) => {
-      const r = canvas.getBoundingClientRect();
-      const t = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
-      return { x: t.clientX - r.left, y: t.clientY - r.top };
-    };
-
-    const onDown = (e) => {
-      e.preventDefault();
-      const p = getPos(e);
-      const { w, h } = sizeCanvas(canvas);
-      const anchorX = w * 0.28;
-      const anchorY = h * 0.55;
-      const px = anchorX + launch.dx;
-      const py = anchorY + launch.dy;
-      const dist = Math.hypot(p.x - px, p.y - py);
-      if (dist < 80) {
-        launch.pulling = true;
-        launch.ox = p.x;
-        launch.oy = p.y;
-        try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-      }
-    };
-    const onMove = (e) => {
-      if (!launch.pulling) return;
-      e.preventDefault();
-      const p = getPos(e);
-      const { w, h } = sizeCanvas(canvas);
-      const anchorX = w * 0.28;
-      const anchorY = h * 0.55;
-      let dx = p.x - anchorX;
-      let dy = p.y - anchorY;
-      // Prefer pull back (left) and a bit down/up
-      dx = Math.max(-140, Math.min(20, dx));
-      dy = Math.max(-80, Math.min(90, dy));
-      launch.dx = dx;
-      launch.dy = dy;
-      const pull = Math.hypot(dx, dy);
-      launch.power = Math.min(1, pull / 130);
-      launch.angle = Math.atan2(-dy * 0.35 - 20, Math.max(30, -dx + 40)) ;
-      // Prefer upward-ish launch
-      if (launch.angle > 0.2) launch.angle = 0.2;
-      if (launch.angle < -1.1) launch.angle = -1.1;
-      updatePowerMeter(launch.power);
-      drawLaunch(canvas);
-    };
-    const onUp = (e) => {
-      if (!launch.pulling) return;
-      e.preventDefault();
-      launch.pulling = false;
-      const power = launch.power;
-      const angle = launch.angle;
-      if (power < 0.12) {
-        launch.dx = 0;
-        launch.dy = 0;
-        launch.power = 0;
-        updatePowerMeter(0);
-        drawLaunch(canvas);
-        setPrompt('Pull farther back to charge power!');
+      if (msg) msg.textContent = cn > 0 ? 'Get ready, pilot!' : 'Blast off!';
+      if (cn <= 0) {
+        if (global.KidsAudio && KidsAudio.correct) KidsAudio.correct();
+        countdownTimer = setTimeout(() => {
+          if (mode !== 'countdown') return;
+          beginFlight();
+        }, 400);
         return;
       }
-      if (global.KidsAudio && KidsAudio.correct) KidsAudio.correct();
-      beginFlight(power, angle);
+      if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+      cn -= 1;
+      countdownTimer = setTimeout(panelTick, 700);
     };
-
-    canvas.onpointerdown = onDown;
-    canvas.onpointermove = onMove;
-    canvas.onpointerup = onUp;
-    canvas.onpointercancel = onUp;
-    canvas.style.touchAction = 'none';
+    panelTick();
   }
 
-  function beginFlight(power, angle) {
+  function prepareArena() {
+    const wd = world();
+    const diff = difficulty();
+    const sh = ship();
+    const arena = wd.arena;
+    const maxSpeed = diff.maxSpeed * sh.thrust * (upgrades.speed ? 1.28 : 1);
+    const fireMs = diff.fireMs / (sh.fire * (upgrades.fire ? 1.45 : 1));
+    plane = {
+      x: arena / 2,
+      y: arena / 2,
+      vx: 0,
+      vy: 0,
+      angle: -Math.PI / 2,
+      alive: true,
+      invuln: 0,
+      shield: upgrades.shield ? 3 : 1,
+      maxSpeed,
+      fireMs,
+      turn: diff.turn * sh.turn,
+      thrust: diff.thrust * sh.thrust * (upgrades.speed ? 1.2 : 1),
+      r: isPrek() ? 26 : 22
+    };
+    bullets = [];
+    particles = [];
+    score = 0;
+    collected = { stars: 0, kills: 0 };
+    flightDone = false;
+    fireCooldown = 0;
+    flavor = pickFlavor();
+    entities = spawnArena(wd, arena);
+    cam = { x: plane.x, y: plane.y };
+    keys = {};
+    pad = { up: false, down: false, left: false, right: false, fire: false };
+    fireHeld = false;
+  }
+
+  function beginFlight() {
     showPanel('fly');
     const canvas = $('#flight-fly-canvas');
     if (!canvas) return;
     sizeCanvas(canvas);
-    const diff = difficulty();
-    const wd = world();
-    const { w, h } = { w: parseFloat(canvas.style.width), h: parseFloat(canvas.style.height) };
-
-    const boost = 2.5 + power * 5.5;
-    plane = {
-      x: 90,
-      y: h * 0.55,
-      vx: Math.cos(angle) * boost + diff.speed,
-      vy: Math.sin(angle) * boost * 0.9,
-      angle: angle,
-      alive: true,
-      invuln: 0
-    };
-    score = 0;
-    collected = { rings: 0, stars: 0 };
-    flightDone = false;
-    flavor = pickFlavor();
-    entities = spawnWorld(wd, diff, w, h);
-    keys = {};
-    pad = { up: false, down: false, left: false, right: false };
-    setPrompt(`${wd.emoji} ${wd.name} · ${flavor}`);
+    if (!plane) prepareArena();
+    sessionLeft = SESSION_SECONDS;
+    sessionStartedAt = performance.now();
+    lastTs = performance.now();
+    setPrompt(`${world().emoji} ${world().name} · ${flavor}`);
     updateHud();
     stopLoop();
     raf = requestAnimationFrame(tickFly);
@@ -628,86 +493,156 @@
 
   function pickFlavor() {
     const lines = [
-      'Do a barrel roll!',
+      'Blast those soft targets!',
       'Fox power — keep flying!',
-      'Rings ahead, pilot!',
-      'Soft clouds only — you got this!',
-      'Wings steady, stars shiny!'
+      'Stars ahead, pilot!',
+      'Bounce off the soft walls!',
+      'Zap drones · grab stars!'
     ];
     return lines[Math.floor(Math.random() * lines.length)];
   }
 
-  function spawnWorld(wd, diff, viewW, viewH) {
+  function spawnArena(wd, arena) {
     const list = [];
-    const len = wd.length;
-    const margin = 280;
-    for (let i = 0; i < wd.rings; i++) {
+    const margin = 80;
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const awayFromCenter = () => {
+      let x, y, tries = 0;
+      do {
+        x = rand(margin, arena - margin);
+        y = rand(margin, arena - margin);
+        tries++;
+      } while (tries < 20 && Math.hypot(x - arena / 2, y - arena / 2) < 180);
+      return { x, y };
+    };
+
+    const enemyN = isPrek() ? Math.max(4, wd.enemies - 3) : wd.enemies;
+    for (let i = 0; i < enemyN; i++) {
+      const p = awayFromCenter();
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 0.6 + Math.random() * 1.1;
       list.push({
-        type: 'ring',
-        x: margin + (i + 0.5) * (len - margin) / wd.rings + (Math.random() * 80 - 40),
-        y: 60 + Math.random() * (viewH - 140),
-        r: isPrek() ? 34 : 28,
-        emoji: wd.collectRing,
-        got: false,
-        points: 10
+        type: 'enemy',
+        x: p.x,
+        y: p.y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        r: isPrek() ? 28 : 24,
+        emoji: wd.enemyEmoji,
+        hp: 1,
+        points: 15
+      });
+    }
+    const rockN = isPrek() ? Math.max(3, wd.asteroids - 2) : wd.asteroids;
+    for (let i = 0; i < rockN; i++) {
+      const p = awayFromCenter();
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 0.35 + Math.random() * 0.7;
+      list.push({
+        type: 'asteroid',
+        x: p.x,
+        y: p.y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        r: 20 + Math.random() * 16,
+        emoji: wd.rockEmoji,
+        hp: 1,
+        points: 10,
+        spin: (Math.random() - 0.5) * 0.04
       });
     }
     for (let i = 0; i < wd.stars; i++) {
+      const p = awayFromCenter();
       list.push({
         type: 'star',
-        x: margin + (i + 0.3) * (len - margin) / wd.stars + (Math.random() * 60 - 30),
-        y: 50 + Math.random() * (viewH - 130),
-        r: isPrek() ? 30 : 24,
-        emoji: wd.collectStar,
+        x: p.x,
+        y: p.y,
+        r: isPrek() ? 26 : 22,
+        emoji: wd.starEmoji,
         got: false,
-        points: 25
+        points: 25,
+        bob: Math.random() * Math.PI * 2
       });
     }
-    const obsCount = isPrek() ? Math.max(2, wd.obstacles - 2) : wd.obstacles;
-    for (let i = 0; i < obsCount; i++) {
-      list.push({
-        type: 'obstacle',
-        x: margin + 200 + i * (len - margin - 200) / Math.max(1, obsCount) + (Math.random() * 100 - 50),
-        y: 70 + Math.random() * (viewH - 160),
-        r: isPrek() ? 26 : 32,
-        emoji: wd.obstacleEmoji,
-        soft: true
-      });
-    }
-    // Finish gate
-    list.push({
-      type: 'finish',
-      x: len - 40,
-      y: viewH / 2,
-      r: 50,
-      emoji: '🏁'
-    });
-    // Background bits (decorative)
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 18; i++) {
       list.push({
         type: 'bg',
-        x: 100 + Math.random() * len,
-        y: 30 + Math.random() * (viewH - 80),
+        x: rand(40, arena - 40),
+        y: rand(40, arena - 40),
         r: 10,
         emoji: wd.bgBits[i % wd.bgBits.length],
-        parallax: 0.3 + Math.random() * 0.4
+        parallax: 0.25 + Math.random() * 0.35
       });
     }
     return list;
   }
 
+  function respawnTarget(type) {
+    const wd = world();
+    const arena = wd.arena;
+    const margin = 80;
+    let x, y, tries = 0;
+    do {
+      x = margin + Math.random() * (arena - margin * 2);
+      y = margin + Math.random() * (arena - margin * 2);
+      tries++;
+    } while (tries < 25 && plane && Math.hypot(x - plane.x, y - plane.y) < 220);
+    const ang = Math.random() * Math.PI * 2;
+    if (type === 'enemy') {
+      const spd = 0.6 + Math.random() * 1.1;
+      return {
+        type: 'enemy',
+        x, y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        r: isPrek() ? 28 : 24,
+        emoji: wd.enemyEmoji,
+        hp: 1,
+        points: 15
+      };
+    }
+    if (type === 'asteroid') {
+      const spd = 0.35 + Math.random() * 0.7;
+      return {
+        type: 'asteroid',
+        x, y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        r: 20 + Math.random() * 16,
+        emoji: wd.rockEmoji,
+        hp: 1,
+        points: 10,
+        spin: (Math.random() - 0.5) * 0.04
+      };
+    }
+    return {
+      type: 'star',
+      x, y,
+      r: isPrek() ? 26 : 22,
+      emoji: wd.starEmoji,
+      got: false,
+      points: 25,
+      bob: Math.random() * Math.PI * 2
+    };
+  }
+
   function updateHud() {
     const s = $('#flight-score');
     if (s) s.textContent = String(score);
-    const r = $('#flight-rings');
-    if (r) r.textContent = String(collected.rings);
+    const k = $('#flight-kills');
+    if (k) k.textContent = String(collected.kills);
     const st = $('#flight-stars-got');
     if (st) st.textContent = String(collected.stars);
     const fl = $('#flight-flavor');
     if (fl) fl.textContent = flavor;
+    const t = $('#flight-timer');
+    if (t) {
+      t.textContent = formatTime(sessionLeft);
+      t.parentElement && t.parentElement.classList.toggle('flight-timer-low', sessionLeft <= 60);
+    }
   }
 
-  function tickFly() {
+  function tickFly(ts) {
     raf = 0;
     if (mode !== 'fly' || !plane || flightDone) return;
     const canvas = $('#flight-fly-canvas');
@@ -718,176 +653,536 @@
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    stepPhysics(w, h);
+    const dt = Math.min(0.05, (ts - lastTs) / 1000) || 0.016;
+    lastTs = ts;
+
+    sessionLeft = Math.max(0, SESSION_SECONDS - (ts - sessionStartedAt) / 1000);
+    if (sessionLeft <= 0) {
+      finishFlight(true, 'timeup');
+      return;
+    }
+
+    stepPhysics(w, h, dt);
     drawFly(ctx, w, h);
+    updateHud();
 
     if (!flightDone) raf = requestAnimationFrame(tickFly);
   }
 
-  function stepPhysics(w, h) {
+  function wantsFire() {
+    return !!(keys[' '] || keys.Spacebar || pad.fire || fireHeld);
+  }
+
+  function stepPhysics(viewW, viewH, dt) {
+    const wd = world();
+    const arena = wd.arena;
     const diff = difficulty();
-    const up = keys.ArrowUp || keys.w || keys.W || pad.up;
-    const down = keys.ArrowDown || keys.s || keys.S || pad.down;
-    const left = keys.ArrowLeft || keys.a || keys.A || pad.left;
-    const right = keys.ArrowRight || keys.d || keys.D || pad.right;
+    const turnL = keys.ArrowLeft || keys.a || keys.A || pad.left;
+    const turnR = keys.ArrowRight || keys.d || keys.D || pad.right;
+    const thrust = keys.ArrowUp || keys.w || keys.W || pad.up;
+    const brake = keys.ArrowDown || keys.s || keys.S || pad.down;
 
-    if (up) plane.vy -= diff.lift;
-    if (down) plane.vy += diff.lift * 0.9;
-    if (left) plane.vx = Math.max(diff.speed * 0.55, plane.vx - 0.08);
-    if (right) plane.vx = Math.min(diff.speed * 1.6, plane.vx + 0.12);
+    if (turnL) plane.angle -= plane.turn * (dt * 60);
+    if (turnR) plane.angle += plane.turn * (dt * 60);
 
-    plane.vy += diff.gravity;
-    plane.vx += (diff.speed - plane.vx) * 0.02;
-    plane.x += plane.vx;
-    plane.y += plane.vy;
-    plane.angle = Math.atan2(plane.vy, Math.max(0.5, plane.vx)) * 0.65;
+    if (thrust) {
+      plane.vx += Math.cos(plane.angle) * plane.thrust * (dt * 60);
+      plane.vy += Math.sin(plane.angle) * plane.thrust * (dt * 60);
+    }
+    if (brake) {
+      plane.vx *= Math.pow(0.92, dt * 60);
+      plane.vy *= Math.pow(0.92, dt * 60);
+      // gentle reverse
+      plane.vx -= Math.cos(plane.angle) * plane.thrust * 0.35 * (dt * 60);
+      plane.vy -= Math.sin(plane.angle) * plane.thrust * 0.35 * (dt * 60);
+    }
 
-    // Soft bounds
-    if (plane.y < 28) { plane.y = 28; plane.vy = Math.abs(plane.vy) * 0.3; }
-    if (plane.y > h - 40) { plane.y = h - 40; plane.vy = -Math.abs(plane.vy) * 0.35; }
+    // Drag
+    plane.vx *= Math.pow(0.985, dt * 60);
+    plane.vy *= Math.pow(0.985, dt * 60);
 
-    if (plane.invuln > 0) plane.invuln--;
+    const spd = Math.hypot(plane.vx, plane.vy);
+    if (spd > plane.maxSpeed) {
+      plane.vx = (plane.vx / spd) * plane.maxSpeed;
+      plane.vy = (plane.vy / spd) * plane.maxSpeed;
+    }
 
-    const cam = plane.x - w * 0.28;
-    for (const e of entities) {
-      if (e.type === 'bg' || e.got) continue;
-      const ex = e.x - cam;
-      const dx = ex - (plane.x - cam);
-      // plane screen x is ~w*0.28
-      const pScreenX = w * 0.28;
-      const pScreenY = plane.y;
-      const eScreenX = e.x - cam;
-      const eScreenY = e.y;
-      const dist = Math.hypot(eScreenX - pScreenX, eScreenY - pScreenY);
-      const hitR = e.r + diff.hitPadding;
-      if (dist < hitR) {
-        if (e.type === 'ring' || e.type === 'star') {
-          e.got = true;
-          score += e.points;
-          if (e.type === 'ring') collected.rings++;
-          else collected.stars++;
-          if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
-          updateHud();
-        } else if (e.type === 'obstacle' && plane.invuln <= 0) {
-          plane.vx *= diff.obstacleSlow;
-          plane.vy *= -0.4;
-          plane.invuln = 35;
-          score = Math.max(0, score - 3);
-          if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
-          flavor = 'Whoops — soft bump! Keep flying!';
-          updateHud();
-        } else if (e.type === 'finish') {
-          finishFlight(true);
-          return;
+    plane.x += plane.vx * (dt * 60);
+    plane.y += plane.vy * (dt * 60);
+
+    // Soft walls — bounce, never fall off
+    const padWall = plane.r + 8;
+    if (plane.x < padWall) { plane.x = padWall; plane.vx = Math.abs(plane.vx) * 0.55; }
+    if (plane.x > arena - padWall) { plane.x = arena - padWall; plane.vx = -Math.abs(plane.vx) * 0.55; }
+    if (plane.y < padWall) { plane.y = padWall; plane.vy = Math.abs(plane.vy) * 0.55; }
+    if (plane.y > arena - padWall) { plane.y = arena - padWall; plane.vy = -Math.abs(plane.vy) * 0.55; }
+
+    if (plane.invuln > 0) plane.invuln -= dt * 60;
+
+    // Camera follow
+    cam.x += (plane.x - cam.x) * Math.min(1, 0.12 * (dt * 60));
+    cam.y += (plane.y - cam.y) * Math.min(1, 0.12 * (dt * 60));
+
+    // Fire
+    fireCooldown = Math.max(0, fireCooldown - dt * 1000);
+    if (wantsFire() && fireCooldown <= 0) {
+      shoot();
+      fireCooldown = plane.fireMs;
+    }
+
+    // Bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.x += b.vx * (dt * 60);
+      b.y += b.vy * (dt * 60);
+      b.life -= dt;
+      if (b.life <= 0 || b.x < -40 || b.y < -40 || b.x > arena + 40 || b.y > arena + 40) {
+        bullets.splice(i, 1);
+        continue;
+      }
+      // Hit enemies / asteroids
+      for (let j = entities.length - 1; j >= 0; j--) {
+        const e = entities[j];
+        if (e.type !== 'enemy' && e.type !== 'asteroid') continue;
+        if (e.hp <= 0) continue;
+        if (Math.hypot(b.x - e.x, b.y - e.y) < e.r + b.r) {
+          e.hp -= 1;
+          bullets.splice(i, 1);
+          if (e.hp <= 0) {
+            popDestroy(e);
+            score += e.points;
+            collected.kills++;
+            const kind = e.type;
+            entities.splice(j, 1);
+            // Respawn after a beat so arena stays lively
+            setTimeout(() => {
+              if (mode === 'fly' && !flightDone) entities.push(respawnTarget(kind));
+            }, 900 + Math.random() * 1200);
+            if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
+            flavor = kind === 'enemy' ? 'Drone down — nice shot!' : 'Rock blasted — soft pop!';
+          } else {
+            spawnSparks(e.x, e.y, '#ffeaa7', 4);
+          }
+          break;
         }
       }
     }
 
-    // End of world fallback
-    if (plane.x > world().length + 20) finishFlight(true);
+    // Move enemies / asteroids with soft walls
+    for (const e of entities) {
+      if (e.type === 'bg' || e.type === 'star') {
+        if (e.type === 'star') e.bob = (e.bob || 0) + dt * 3;
+        continue;
+      }
+      if (e.type === 'enemy' || e.type === 'asteroid') {
+        // Mild chase for enemies
+        if (e.type === 'enemy' && plane) {
+          const dx = plane.x - e.x;
+          const dy = plane.y - e.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const chase = diff.enemySpeed * 0.015 * (dt * 60);
+          e.vx += (dx / dist) * chase;
+          e.vy += (dy / dist) * chase;
+          const es = Math.hypot(e.vx, e.vy);
+          const maxE = diff.enemySpeed * (isPrek() ? 1.4 : 2.2);
+          if (es > maxE) {
+            e.vx = (e.vx / es) * maxE;
+            e.vy = (e.vy / es) * maxE;
+          }
+        }
+        e.x += e.vx * (dt * 60);
+        e.y += e.vy * (dt * 60);
+        if (e.spin) e.angle = (e.angle || 0) + e.spin * (dt * 60);
+        const er = e.r;
+        if (e.x < er) { e.x = er; e.vx = Math.abs(e.vx); }
+        if (e.x > arena - er) { e.x = arena - er; e.vx = -Math.abs(e.vx); }
+        if (e.y < er) { e.y = er; e.vy = Math.abs(e.vy); }
+        if (e.y > arena - er) { e.y = arena - er; e.vy = -Math.abs(e.vy); }
+      }
+    }
+
+    // Plane vs collectibles / bumps
+    for (let j = entities.length - 1; j >= 0; j--) {
+      const e = entities[j];
+      if (e.type === 'bg') continue;
+      if (e.got) continue;
+      const dist = Math.hypot(e.x - plane.x, e.y - plane.y);
+      if (dist < e.r + plane.r - diff.hitPad) {
+        if (e.type === 'star') {
+          e.got = true;
+          score += e.points;
+          collected.stars++;
+          spawnSparks(e.x, e.y, '#ffd93d', 8);
+          if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
+          entities.splice(j, 1);
+          setTimeout(() => {
+            if (mode === 'fly' && !flightDone) entities.push(respawnTarget('star'));
+          }, 1500);
+          flavor = 'Star grabbed!';
+        } else if ((e.type === 'enemy' || e.type === 'asteroid') && plane.invuln <= 0) {
+          softBump(e);
+        }
+      }
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * (dt * 60);
+      p.y += p.vy * (dt * 60);
+      p.life -= dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function softBump(e) {
+    // Bounce plane away; spend shield pip if any
+    const dx = plane.x - e.x;
+    const dy = plane.y - e.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    plane.vx += (dx / dist) * 3.5;
+    plane.vy += (dy / dist) * 3.5;
+    e.vx -= (dx / dist) * 1.5;
+    e.vy -= (dy / dist) * 1.5;
+    plane.invuln = 40;
+    if (plane.shield > 0) {
+      plane.shield -= 1;
+      score = Math.max(0, score - 1);
+      flavor = plane.shield > 0 ? 'Shield soaked it — keep flying!' : 'Shield gone — still soft bumps only!';
+    } else {
+      score = Math.max(0, score - 3);
+      flavor = 'Whoops — soft bump! Keep flying!';
+    }
+    spawnSparks(plane.x, plane.y, '#a29bfe', 6);
+    if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
+  }
+
+  function shoot() {
+    if (!plane) return;
+    const diff = difficulty();
+    const sh = ship();
+    const ang = plane.angle;
+    const speed = diff.bulletSpeed;
+    bullets.push({
+      x: plane.x + Math.cos(ang) * (plane.r + 6),
+      y: plane.y + Math.sin(ang) * (plane.r + 6),
+      vx: Math.cos(ang) * speed + plane.vx * 0.3,
+      vy: Math.sin(ang) * speed + plane.vy * 0.3,
+      r: 5,
+      life: 1.1,
+      color: sh.color
+    });
+    spawnSparks(
+      plane.x + Math.cos(ang) * plane.r,
+      plane.y + Math.sin(ang) * plane.r,
+      sh.color,
+      3
+    );
+    if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+  }
+
+  function popDestroy(e) {
+    spawnSparks(e.x, e.y, '#ffeaa7', 12);
+    spawnSparks(e.x, e.y, '#74b9ff', 6);
+    // Soft “poof” emoji particle
+    particles.push({
+      x: e.x, y: e.y, vx: 0, vy: -0.6, life: 0.55,
+      emoji: '💨', size: 22
+    });
+  }
+
+  function spawnSparks(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 1 + Math.random() * 3;
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        life: 0.35 + Math.random() * 0.35,
+        color,
+        size: 3 + Math.random() * 3
+      });
+    }
   }
 
   function drawFly(ctx, w, h) {
     const wd = world();
-    const cam = plane.x - w * 0.28;
+    const arena = wd.arena;
     const grad = ctx.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, wd.skyTop);
     grad.addColorStop(1, wd.skyBot);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    // Ground parallax strip
-    ctx.fillStyle = wd.ground;
-    ctx.globalAlpha = 0.85;
-    ctx.fillRect(0, h - 28, w, 28);
+    const ox = w / 2 - cam.x;
+    const oy = h / 2 - cam.y;
+
+    // Arena floor tint
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(0, 0, arena, arena);
+
+    // Soft wall glow
+    ctx.strokeStyle = wd.accent;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 10;
+    ctx.strokeRect(4, 4, arena - 8, arena - 8);
+    ctx.globalAlpha = 0.25;
+    ctx.lineWidth = 22;
+    ctx.strokeRect(0, 0, arena, arena);
     ctx.globalAlpha = 1;
 
-    // Entities
+    // Grid dots for orientation
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    for (let gx = 80; gx < arena; gx += 80) {
+      for (let gy = 80; gy < arena; gy += 80) {
+        ctx.beginPath();
+        ctx.arc(gx, gy, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Background bits
     for (const e of entities) {
-      if (e.got) continue;
-      const parallax = e.parallax || 1;
-      const sx = e.x - cam * parallax;
-      if (sx < -60 || sx > w + 60) continue;
-      const alpha = e.type === 'bg' ? 0.45 : 1;
-      ctx.globalAlpha = alpha;
-      ctx.font = `${e.type === 'bg' ? 22 : e.type === 'finish' ? 40 : 30}px serif`;
+      if (e.type !== 'bg') continue;
+      ctx.globalAlpha = 0.4;
+      ctx.font = '22px serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(e.emoji, sx, e.y);
-      if (e.type === 'ring' || e.type === 'star') {
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-        ctx.lineWidth = 2;
-        ctx.arc(sx, e.y, e.r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
+      ctx.fillText(e.emoji, e.x, e.y);
       ctx.globalAlpha = 1;
     }
 
-    // Plane
-    const blink = plane.invuln > 0 && (plane.invuln % 6 < 3);
-    if (!blink) drawPlaneEmoji(ctx, w * 0.28, plane.y, 1.1, plane.angle);
+    // Stars / enemies / asteroids
+    for (const e of entities) {
+      if (e.type === 'bg' || e.got) continue;
+      const bobY = e.type === 'star' ? Math.sin(e.bob || 0) * 4 : 0;
+      ctx.save();
+      ctx.translate(e.x, e.y + bobY);
+      if (e.angle) ctx.rotate(e.angle);
+      ctx.font = `${e.type === 'asteroid' ? Math.round(e.r * 1.6) : 30}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(e.emoji, 0, 0);
+      if (e.type === 'star') {
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 2;
+        ctx.arc(0, 0, e.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
-    // Progress bar
-    const prog = Math.min(1, plane.x / world().length);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.fillRect(12, 10, w - 24, 10);
-    ctx.fillStyle = wd.accent;
-    ctx.fillRect(12, 10, (w - 24) * prog, 10);
+    // Bullets
+    for (const b of bullets) {
+      ctx.beginPath();
+      ctx.fillStyle = b.color || '#ffeaa7';
+      ctx.shadowColor = b.color || '#ffeaa7';
+      ctx.shadowBlur = 8;
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // Particles
+    for (const p of particles) {
+      if (p.emoji) {
+        ctx.globalAlpha = Math.max(0, p.life * 2);
+        ctx.font = `${p.size || 18}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.emoji, p.x, p.y);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.globalAlpha = Math.max(0, p.life * 2);
+        ctx.fillStyle = p.color || '#fff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size || 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Plane — faces travel/aim direction (top-down)
+    if (plane) {
+      const blink = plane.invuln > 0 && (Math.floor(plane.invuln) % 6 < 3);
+      if (!blink) drawPlaneTopDown(ctx, plane.x, plane.y, plane.angle);
+      // Shield ring
+      if (plane.shield > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(116,185,255,0.65)';
+        ctx.lineWidth = 3;
+        ctx.arc(plane.x, plane.y, plane.r + 8, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+
+    // Mini-map
+    drawMinimap(ctx, w, h, arena);
+
+    // Edge vignette hint when near wall
+    if (plane) {
+      const near = 120;
+      if (plane.x < near || plane.y < near || plane.x > arena - near || plane.y > arena - near) {
+        ctx.strokeStyle = 'rgba(255,217,61,0.35)';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(3, 3, w - 6, h - 6);
+      }
+    }
   }
 
-  function finishFlight(success) {
+  function drawPlaneTopDown(ctx, x, y, angle) {
+    const sh = ship();
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    // Simple geometric plane (nose points +X / angle direction)
+    ctx.fillStyle = sh.color;
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(22, 0);
+    ctx.lineTo(-14, 12);
+    ctx.lineTo(-8, 0);
+    ctx.lineTo(-14, -12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Wings
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath();
+    ctx.moveTo(2, 0);
+    ctx.lineTo(-6, 18);
+    ctx.lineTo(-10, 0);
+    ctx.lineTo(-6, -18);
+    ctx.closePath();
+    ctx.fill();
+    // Cockpit
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(4, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Emoji badge
+    ctx.rotate(-angle);
+    ctx.font = '16px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(sh.emoji, 0, -26);
+    ctx.restore();
+  }
+
+  function drawMinimap(ctx, w, h, arena) {
+    const mw = 72;
+    const mh = 72;
+    const mx = w - mw - 10;
+    const my = 10;
+    const scale = mw / arena;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(mx - 2, my - 2, mw + 4, mh + 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(mx, my, mw, mh);
+    for (const e of entities) {
+      if (e.type === 'bg' || e.got) continue;
+      ctx.fillStyle = e.type === 'star' ? '#ffd93d' : (e.type === 'enemy' ? '#ff7675' : '#dfe6e9');
+      ctx.fillRect(mx + e.x * scale - 1.5, my + e.y * scale - 1.5, 3, 3);
+    }
+    if (plane) {
+      ctx.fillStyle = ship().color;
+      ctx.beginPath();
+      ctx.arc(mx + plane.x * scale, my + plane.y * scale, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function finishFlight(success, reason) {
     if (flightDone) return;
     flightDone = true;
     stopLoop();
-    const diff = difficulty();
-    const starBonus = collected.stars;
-    const ringBonus = collected.rings;
-    const cleared = success && (starBonus >= diff.targetStars || plane.x > world().length * 0.85);
+
     let earned = 0;
-    if (cleared) earned += 1;
-    if (starBonus >= diff.targetStars) earned += 1;
-    if (ringBonus >= 3) earned += 1;
+    if (collected.kills >= 3) earned += 1;
+    if (collected.kills >= 8) earned += 1;
+    if (collected.stars >= 3) earned += 1;
     if (score >= 80) earned += 1;
+    if (score >= 150) earned += 1;
     earned = Math.max(success ? 1 : 0, Math.min(5, earned));
 
+    const timeup = reason === 'timeup';
     const nextUnlock = worldIdx + 1;
+
     const progressPatch = {
       completedDelta: success ? 1 : 0,
       score,
       starsEarned: earned,
       worldId: worldIdx,
       unlockWorld: (success && nextUnlock < WORLDS.length) ? nextUnlock : null,
-      rings: collected.rings,
+      rings: collected.kills,
       stars: collected.stars,
-      cleared: !!cleared
+      kills: collected.kills,
+      cleared: collected.kills >= 5 || collected.stars >= 3,
+      timeup: !!timeup,
+      lockFlight: !!timeup,
+      shipId,
+      upgrades: Object.assign({}, upgrades)
     };
 
     showPanel('results');
     const title = $('#flight-results-title');
     const body = $('#flight-results-body');
     const starsEl = $('#flight-results-stars');
-    if (title) title.textContent = cleared ? 'Flight complete!' : (success ? 'Nice try, pilot!' : 'Flight over');
+    const emojiEl = $('#flight-results-emoji');
+    const gate = $('#flight-results-gate');
+    const retry = $('#flight-retry');
+
+    if (emojiEl) emojiEl.textContent = timeup ? '⏰' : '🦊';
+    if (title) {
+      title.textContent = timeup
+        ? "Fly time's up!"
+        : (progressPatch.cleared ? 'Flight complete!' : 'Nice flying, pilot!');
+    }
     if (body) {
-      body.textContent = `${world().emoji} ${world().name} · Score ${score} · Rings ${collected.rings} · Stars ${collected.stars}` +
-        (progressPatch.unlockWorld != null ? ` · New world unlocked!` : '');
+      body.textContent =
+        `${world().emoji} ${world().name} · Score ${score} · Hits ${collected.kills} · Stars ${collected.stars}` +
+        (progressPatch.unlockWorld != null ? ' · New world unlocked!' : '') +
+        (timeup ? ' · Session saved.' : '');
     }
     if (starsEl) starsEl.textContent = '⭐'.repeat(earned) || '💫';
+
+    if (gate) gate.classList.toggle('hidden', !timeup);
+    if (retry) {
+      retry.classList.toggle('hidden', !!timeup);
+      retry.textContent = '🚀 Fly again';
+    }
 
     if (global.KidsAudio && success && KidsAudio.win) KidsAudio.win();
     else if (global.KidsAudio && KidsAudio.correct) KidsAudio.correct();
 
     if (hooks.onComplete) hooks.onComplete(progressPatch);
-    setPrompt(cleared ? 'You did it! Pick another world or fly again.' : 'Collect more stars next time — you can do it!');
+
+    setPrompt(
+      timeup
+        ? `Fly time's up! Answer ${QUESTIONS_TO_UNLOCK} questions in Science (or Math / Reading / Spelling) to unlock more flight.`
+        : 'Great run! Fly again or pick another world.'
+    );
   }
 
   function onKeyDown(e) {
     if (mode !== 'fly') return;
     keys[e.key] = true;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+    if (e.key === ' ' || e.code === 'Space') {
+      fireHeld = true;
+      e.preventDefault();
+    }
   }
   function onKeyUp(e) {
     keys[e.key] = false;
+    if (e.key === ' ' || e.code === 'Space') fireHeld = false;
   }
 
   function bindPad() {
@@ -896,10 +1191,33 @@
     root.querySelectorAll('[data-dir]').forEach(btn => {
       const dir = btn.dataset.dir;
       const set = (v) => { pad[dir] = v; };
-      btn.addEventListener('pointerdown', e => { e.preventDefault(); set(true); btn.setPointerCapture(e.pointerId); });
+      btn.addEventListener('pointerdown', e => { e.preventDefault(); set(true); try { btn.setPointerCapture(e.pointerId); } catch (err) { /* */ } });
       btn.addEventListener('pointerup', () => set(false));
       btn.addEventListener('pointercancel', () => set(false));
       btn.addEventListener('lostpointercapture', () => set(false));
+    });
+    const fireBtn = $('#flight-fire');
+    if (fireBtn) {
+      const setFire = (v) => { pad.fire = v; fireHeld = v; };
+      fireBtn.addEventListener('pointerdown', e => { e.preventDefault(); setFire(true); try { fireBtn.setPointerCapture(e.pointerId); } catch (err) { /* */ } });
+      fireBtn.addEventListener('pointerup', () => setFire(false));
+      fireBtn.addEventListener('pointercancel', () => setFire(false));
+      fireBtn.addEventListener('lostpointercapture', () => setFire(false));
+    }
+  }
+
+  function goSubject(subject) {
+    if (hooks.onOpenSubject) hooks.onOpenSubject(subject);
+  }
+
+  function bindSubjectLinks(root) {
+    $$(root ? root + ' [data-flight-subject]' : '[data-flight-subject]').forEach(btn => {
+      if (btn.dataset.boundFlight) return;
+      btn.dataset.boundFlight = '1';
+      btn.addEventListener('click', () => {
+        if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+        goSubject(btn.dataset.flightSubject);
+      });
     });
   }
 
@@ -907,20 +1225,23 @@
     if (bound) return;
     bound = true;
     $('#flight-start-flight')?.addEventListener('click', () => {
-      if (!requiredReady()) return;
+      if (isLocked()) {
+        renderMenu();
+        return;
+      }
       if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
-      startLaunch();
+      beginCountdown();
     });
     $('#flight-back-menu')?.addEventListener('click', () => {
       if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
       renderMenu();
     });
-    $('#flight-back-build')?.addEventListener('click', () => {
-      if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
-      startBuild();
-    });
     $('#flight-retry')?.addEventListener('click', () => {
       if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+      if (isLocked()) {
+        renderMenu();
+        return;
+      }
       startBuild();
     });
     $('#flight-again')?.addEventListener('click', () => {
@@ -928,6 +1249,7 @@
       renderMenu();
     });
     bindPad();
+    bindSubjectLinks();
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
   }
@@ -936,6 +1258,7 @@
     grade = g || 'grade2';
     hooks = h || {};
     bindUi();
+    bindSubjectLinks();
     const screen = $('#screen-flight');
     if (screen) {
       screen.classList.remove('grade-prek', 'grade-grade2', 'grade-grade3');
@@ -948,15 +1271,42 @@
     stopLoop();
     mode = 'menu';
     keys = {};
-    pad = { up: false, down: false, left: false, right: false };
+    pad = { up: false, down: false, left: false, right: false, fire: false };
+    fireHeld = false;
+    flightDone = true;
+  }
+
+  /** Called by app when a Math/Reading/Spelling/Science answer is logged while gate is active. */
+  function notifyGateAnswer(subject) {
+    const name = String(subject || '');
+    const ok = GATE_SUBJECTS.some(s => s.toLowerCase() === name.toLowerCase());
+    if (!ok) return null;
+    if (!hooks.onGateAnswer) return null;
+    return hooks.onGateAnswer(name);
+  }
+
+  function refreshLockUi() {
+    if (mode === 'menu') updateLockBanner();
+    if (mode === 'results') {
+      const gate = $('#flight-results-gate');
+      if (gate) gate.classList.toggle('hidden', !isLocked());
+    }
   }
 
   global.FlightGame = {
     WORLDS,
-    PARTS,
-    PRESETS,
+    SHIPS,
+    UPGRADES,
+    SESSION_SECONDS,
+    QUESTIONS_TO_UNLOCK,
+    GATE_SUBJECTS,
     start,
     stop,
-    getMode: () => mode
+    getMode: () => mode,
+    isLocked,
+    questionsDone,
+    notifyGateAnswer,
+    refreshLockUi,
+    renderMenu
   };
 })(window);

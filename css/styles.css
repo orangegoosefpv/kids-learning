@@ -2006,6 +2006,46 @@ code {
   opacity: 0.45;
   filter: grayscale(0.4);
 }
+.flight-worlds-locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.flight-lock-banner {
+  background: linear-gradient(145deg, #fff6e0, #ffe8f0);
+  border: 3px solid #fd79a8;
+  border-radius: 18px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  text-align: center;
+  box-shadow: 0 4px 0 rgba(253, 121, 168, 0.35);
+}
+.flight-lock-emoji { font-size: 2.4rem; line-height: 1; }
+.flight-lock-title { margin: 6px 0 8px; font-size: 1.35rem; }
+.flight-lock-msg { margin: 0 0 10px; font-weight: 700; color: #3d2b1f; line-height: 1.4; }
+.flight-lock-progress {
+  display: inline-block;
+  font-weight: 900;
+  font-size: 1.15rem;
+  background: #fff;
+  border: 3px solid #6c5ce7;
+  border-radius: 999px;
+  padding: 6px 16px;
+  margin-bottom: 12px;
+}
+.flight-lock-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.flight-results-gate {
+  margin: 12px 0;
+  padding: 12px;
+  background: #fff8e7;
+  border-radius: 14px;
+  border: 2px dashed #fdcb6e;
+}
 
 .flight-build-toolbar {
   display: flex;
@@ -2032,142 +2072,110 @@ code {
   50% { transform: scale(1.04); }
 }
 
-.flight-presets-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.flight-presets-label { font-weight: 700; color: #555; }
-.flight-presets { display: flex; flex-wrap: wrap; gap: 6px; }
-.flight-preset-btn { font-size: 0.9rem; }
-
-.flight-build-layout {
+.flight-hangar {
   display: grid;
-  grid-template-columns: minmax(160px, 240px) 1fr;
   gap: 14px;
-  align-items: start;
 }
-@media (max-width: 720px) {
-  .flight-build-layout { grid-template-columns: 1fr; }
+.flight-hangar-title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
 }
-
-.flight-parts {
+.flight-boost-hint {
+  font-weight: 600;
+  color: #888;
+  font-size: 0.9rem;
+}
+.flight-ships,
+.flight-upgrades {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.flight-ship-btn,
+.flight-upgrade-btn {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-.flight-part {
-  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  min-height: 52px;
-  border-radius: 14px;
+  gap: 4px;
+  padding: 14px 10px;
+  border-radius: 16px;
   border: 3px solid #74b9ff;
   background: #eef7ff;
-  cursor: grab;
+  cursor: pointer;
   font: inherit;
   font-weight: 800;
-  touch-action: none;
-  user-select: none;
+  text-align: center;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s, background 0.15s;
+  touch-action: manipulation;
 }
-.flight-part:active { cursor: grabbing; }
-.flight-part-emoji { font-size: 1.6rem; }
-.flight-part-label { font-size: 1rem; }
+.flight-ship-btn.selected,
+.flight-upgrade-btn.selected {
+  border-color: #00b894;
+  background: #e8fff6;
+  box-shadow: 0 0 0 3px rgba(0, 184, 148, 0.35);
+  transform: translateY(-2px);
+}
+.flight-ship-emoji,
+.flight-upgrade-emoji { font-size: 2rem; line-height: 1; }
+.flight-ship-name,
+.flight-upgrade-name { font-size: 1rem; }
+.flight-ship-tip,
+.flight-upgrade-tip {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #5a6a85;
+}
 
-.flight-pad-wrap {
-  background: linear-gradient(180deg, #dfefff, #f8fbff);
-  border: 3px dashed #6c5ce7;
-  border-radius: 18px;
-  padding: 12px;
-  min-height: 220px;
+.flight-hangar-preview {
+  text-align: center;
+  padding: 14px;
 }
 .flight-plane-preview {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 2px;
-  min-height: 48px;
-  font-size: 1.8rem;
-  margin-bottom: 8px;
+  gap: 4px;
+  min-height: 56px;
+  font-size: 2.4rem;
+  margin-bottom: 6px;
 }
-.pv-empty { font-size: 1rem; font-weight: 700; color: #888; }
+.flight-loadout-summary {
+  margin: 0;
+  font-weight: 800;
+  color: #3d2b1f;
+}
 
-.flight-build-pad {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(90px, 1fr));
-  gap: 10px;
-}
-.flight-slot {
-  background: #fff;
-  border: 3px solid #cfd8ff;
-  border-radius: 16px;
-  min-height: 88px;
+.flight-countdown-card {
+  text-align: center;
+  padding: 36px 20px;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-  cursor: pointer;
-  touch-action: manipulation;
 }
-.flight-slot-label {
-  font-size: 0.75rem;
+.flight-countdown-num {
+  font-size: 5rem;
+  font-weight: 900;
+  color: #6c5ce7;
+  line-height: 1;
+  animation: flight-pop 0.55s ease;
+}
+.flight-countdown-msg {
   font-weight: 800;
-  color: #6c7a99;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.flight-slot-emoji { font-size: 1.8rem; line-height: 1; }
-.flight-slot.filled {
-  border-color: #00b894;
-  background: #e8fff6;
-}
-.flight-slot.drag-over {
-  border-color: #fdcb6e;
-  box-shadow: 0 0 0 4px rgba(253, 203, 110, 0.45);
-  transform: scale(1.03);
-}
-.flight-slot.just-placed {
-  animation: flight-pop 0.45s ease;
+  font-size: 1.2rem;
+  margin-top: 10px;
 }
 @keyframes flight-pop {
-  0% { transform: scale(0.92); }
-  50% { transform: scale(1.08); }
-  100% { transform: scale(1); }
-}
-
-.flight-touch-ghost {
-  position: fixed;
-  z-index: 9999;
-  pointer-events: none;
-  font-size: 2.2rem;
-  transform: translate(-50%, -50%);
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
-}
-
-.flight-power-wrap { flex: 1; min-width: 160px; }
-.flight-power-label { font-weight: 800; margin-bottom: 4px; }
-.flight-power-track {
-  height: 16px;
-  border-radius: 999px;
-  background: #e0e6f5;
-  overflow: hidden;
-  border: 2px solid #a29bfe;
-}
-.flight-power-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #55efc4, #fdcb6e, #ff7675);
-  transition: width 0.05s linear;
+  0% { transform: scale(0.7); opacity: 0.4; }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .flight-canvas-wrap {
   display: flex;
   justify-content: center;
+  position: relative;
   background: #111;
   border-radius: 16px;
   overflow: hidden;
@@ -2178,7 +2186,20 @@ code {
   display: block;
   max-width: 100%;
   touch-action: none;
-  cursor: grab;
+}
+.flight-countdown-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 5rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.55);
+  background: rgba(0,0,0,0.35);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .flight-hud {
@@ -2189,18 +2210,39 @@ code {
   font-weight: 800;
   margin-bottom: 8px;
 }
+.flight-timer-pill {
+  background: #2d3436;
+  color: #ffeaa7;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 2px solid #fdcb6e;
+  font-variant-numeric: tabular-nums;
+}
+.flight-timer-pill.flight-timer-low {
+  background: #c0392b;
+  color: #fff;
+  border-color: #ff7675;
+  animation: flight-pulse 0.8s ease-in-out infinite;
+}
 .flight-flavor {
   color: #6c5ce7;
   font-style: italic;
 }
 
-.flight-dpad {
+.flight-controls {
   margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px 24px;
+  user-select: none;
+}
+.flight-dpad {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  user-select: none;
 }
 .flight-pad-mid {
   display: flex;
@@ -2223,22 +2265,41 @@ code {
   transform: translateY(2px);
   box-shadow: 0 2px 0 #0652dd;
 }
-.flight-keys-hint { margin: 4px 0 0; }
+.flight-fire-btn {
+  min-width: 110px;
+  min-height: 110px;
+  border-radius: 50%;
+  border: 4px solid #d63031;
+  background: linear-gradient(180deg, #ff7675, #d63031);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 6px 0 #922b21;
+}
+.flight-fire-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #922b21;
+}
+.flight-keys-hint { margin: 4px 0 0; width: 100%; text-align: center; }
 
 .flight-results-card { text-align: center; }
 
-#screen-flight.grade-prek .flight-part,
-#screen-flight.grade-prek .flight-slot {
-  min-height: 96px;
-}
 #screen-flight.grade-prek .flight-pad-btn {
   width: 72px;
   height: 72px;
   font-size: 1.7rem;
 }
+#screen-flight.grade-prek .flight-fire-btn {
+  min-width: 120px;
+  min-height: 120px;
+  font-size: 1.35rem;
+}
 #screen-flight.grade-prek .flight-keys-hint { display: none; }
 
 @media (max-width: 560px) {
-  .flight-build-pad { grid-template-columns: repeat(2, 1fr); }
   .flight-pad-btn { width: 56px; height: 56px; }
+  .flight-fire-btn { min-width: 96px; min-height: 96px; font-size: 1.1rem; }
+  .flight-countdown-num { font-size: 3.6rem; }
 }
