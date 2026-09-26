@@ -86,6 +86,7 @@
 
   function showScreen(id) {
     if (id === 'screen-home') cancelReadAloud();
+    if (id !== 'screen-flight' && window.FlightGame && FlightGame.stop) FlightGame.stop();
     $$('.screen').forEach(s => s.classList.remove('active'));
     const el = $('#' + id);
     if (el) el.classList.add('active');
@@ -158,9 +159,11 @@
       <div class="stat-pill">🔢 Math best: <span>${p.math[kidGrade()] || 0}</span></div>
       <div class="stat-pill">🐵 Monkey Code: <span>${stemDone}/12</span></div>
       <div class="stat-pill">♟️ Chess: <span>${(p.chess && p.chess.completed) || 0}</span></div>
+      <div class="stat-pill">✈️ Flyer: <span>${(p.flight && p.flight.completed) || 0}</span> · best ${ (p.flight && p.flight.bestScore) || 0 }</div>
     `;
     renderJourneyMap(p);
     updateTrackerCount();
+    updateFlightHubHighlight();
   }
 
   function renderJourneyMap(p) {
@@ -180,7 +183,8 @@
       { key: 'spelling', emoji: '✏️', label: 'Spelling', count: (p.spelling && p.spelling.completed) || 0 },
       { key: 'math', emoji: '🔢', label: 'Math', count: p.math[kidGrade()] || 0 },
       { key: 'science', emoji: '🔬', label: 'Science', count: (p.science && p.science.completed) || 0 },
-      { key: 'chess', emoji: '♟️', label: 'Chess', count: (p.chess && p.chess.completed) || 0 }
+      { key: 'chess', emoji: '♟️', label: 'Chess', count: (p.chess && p.chess.completed) || 0 },
+      { key: 'flight', emoji: '✈️', label: 'Flyer', count: (p.flight && p.flight.completed) || 0 }
     ];
     const subjHtml = subjects.map(s => {
       const met = s.count >= 1;
@@ -1963,6 +1967,60 @@
     }
   }
 
+
+  /* ================= Space Fox Flyer ================= */
+  function updateFlightHubHighlight() {
+    const wrap = $('#hub-flight-wrap');
+    if (!wrap) return;
+    const g = kidGrade();
+    wrap.classList.toggle('recommended', g === 'grade2');
+    wrap.classList.toggle('dimmed', g !== 'grade2');
+  }
+
+  function openFlight() {
+    cancelReadAloud();
+    if (window.FlightGame && FlightGame.stop) FlightGame.stop();
+    showScreen('screen-flight');
+    $('#flight-title').textContent = `✈️ Space Fox Flyer · ${KidsStorage.gradeLabel(kidGrade())}`;
+    const speak = $('#flight-speak');
+    if (speak) speak.title = kidGrade() === 'grade2' ? 'Read to me' : 'Read aloud';
+    const p = profile();
+    if (!p.flight) p.flight = { completed: 0, bestScore: 0, unlockedWorlds: [0] };
+    if (!Array.isArray(p.flight.unlockedWorlds)) p.flight.unlockedWorlds = [0];
+
+    FlightGame.start(kidGrade(), {
+      getProgress: () => profile().flight || { completed: 0, bestScore: 0, unlockedWorlds: [0] },
+      onPrompt: (text) => {
+        setReadAloud(text || '', { auto: isPrek() });
+      },
+      onComplete: (result) => {
+        const fp = profile().flight || { completed: 0, bestScore: 0, unlockedWorlds: [0] };
+        if (result.completedDelta) fp.completed = (fp.completed || 0) + result.completedDelta;
+        if (typeof result.score === 'number' && result.score > (fp.bestScore || 0)) {
+          fp.bestScore = result.score;
+        }
+        if (!Array.isArray(fp.unlockedWorlds)) fp.unlockedWorlds = [0];
+        if (!fp.unlockedWorlds.includes(0)) fp.unlockedWorlds.push(0);
+        if (result.unlockWorld != null && !fp.unlockedWorlds.includes(result.unlockWorld)) {
+          fp.unlockedWorlds.push(result.unlockWorld);
+        }
+        profile().flight = fp;
+        const stars = result.starsEarned || 0;
+        if (stars > 0) KidsStorage.addStars(state, stars);
+        persist();
+        updateChrome();
+        refreshHubStats();
+        trackAnswer(
+          'flight',
+          `${(FlightGame.WORLDS[result.worldId] || {}).name || 'World'} flight`,
+          !!result.cleared,
+          `score=${result.score};rings=${result.rings};stars=${result.stars}`
+        );
+        confettiBurst();
+      }
+    });
+  }
+
   /* ---- Wire UI ---- */
   function init() {
     // Persist migrated defaults once (guest key only)
@@ -1999,10 +2057,12 @@
     $('#nav-science')?.addEventListener('click', () => { KidsAudio.click(); openScience(); });
     $('#nav-stem')?.addEventListener('click', () => { KidsAudio.click(); openStem(); });
     $('#nav-chess')?.addEventListener('click', () => { KidsAudio.click(); openChess(); });
+    $('#nav-flight')?.addEventListener('click', () => { KidsAudio.click(); openFlight(); });
 
     $$('.btn-home').forEach(b => b.addEventListener('click', () => {
       KidsAudio.click();
       cancelReadAloud();
+      if (window.FlightGame && FlightGame.stop) FlightGame.stop();
       showScreen('screen-home');
       refreshHubStats();
     }));
@@ -2039,6 +2099,7 @@
     });
 
     $('#chess-speak')?.addEventListener('click', () => { KidsAudio.click(); replayReadAloud(); });
+    $('#flight-speak')?.addEventListener('click', () => { KidsAudio.click(); replayReadAloud(); });
     $('#chess-nav-learn')?.addEventListener('click', () => {
       KidsAudio.click();
       ChessGame.startLearn(kidGrade());

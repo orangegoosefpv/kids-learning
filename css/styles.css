@@ -1980,3 +1980,265 @@ code {
   padding: 1px 5px;
   border-radius: 4px;
 }
+
+/* ---- Space Fox Flyer ---- */
+.btn-flight {
+  background: linear-gradient(145deg, #1e90ff, #6c5ce7 55%, #00cec9);
+  color: #fff;
+  border: 3px solid #a29bfe;
+  box-shadow: 0 6px 0 #2d3436;
+}
+.btn-flight .hint { color: #e8f4ff; opacity: 0.95; }
+
+.hub-card-flight.recommended .btn-flight {
+  box-shadow: 0 0 0 4px #ffd93d, 0 6px 0 #2d3436;
+  transform: translateY(-2px);
+}
+.hub-card-flight.dimmed {
+  opacity: 0.72;
+}
+.hub-card-flight.dimmed .btn-flight {
+  box-shadow: 0 4px 0 #2d3436;
+}
+
+.flight-panel { margin-top: 6px; }
+.flight-worlds .flight-world-btn.locked {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+.flight-build-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.flight-build-status {
+  font-weight: 800;
+  color: #3d2b1f;
+  flex: 1;
+  min-width: 140px;
+}
+#flight-start-flight:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+#flight-start-flight.ready {
+  animation: flight-pulse 1.2s ease-in-out infinite;
+}
+@keyframes flight-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.flight-presets-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.flight-presets-label { font-weight: 700; color: #555; }
+.flight-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.flight-preset-btn { font-size: 0.9rem; }
+
+.flight-build-layout {
+  display: grid;
+  grid-template-columns: minmax(160px, 240px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .flight-build-layout { grid-template-columns: 1fr; }
+}
+
+.flight-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.flight-part {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  min-height: 52px;
+  border-radius: 14px;
+  border: 3px solid #74b9ff;
+  background: #eef7ff;
+  cursor: grab;
+  font: inherit;
+  font-weight: 800;
+  touch-action: none;
+  user-select: none;
+}
+.flight-part:active { cursor: grabbing; }
+.flight-part-emoji { font-size: 1.6rem; }
+.flight-part-label { font-size: 1rem; }
+
+.flight-pad-wrap {
+  background: linear-gradient(180deg, #dfefff, #f8fbff);
+  border: 3px dashed #6c5ce7;
+  border-radius: 18px;
+  padding: 12px;
+  min-height: 220px;
+}
+.flight-plane-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  min-height: 48px;
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+}
+.pv-empty { font-size: 1rem; font-weight: 700; color: #888; }
+
+.flight-build-pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  gap: 10px;
+}
+.flight-slot {
+  background: #fff;
+  border: 3px solid #cfd8ff;
+  border-radius: 16px;
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.flight-slot-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #6c7a99;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.flight-slot-emoji { font-size: 1.8rem; line-height: 1; }
+.flight-slot.filled {
+  border-color: #00b894;
+  background: #e8fff6;
+}
+.flight-slot.drag-over {
+  border-color: #fdcb6e;
+  box-shadow: 0 0 0 4px rgba(253, 203, 110, 0.45);
+  transform: scale(1.03);
+}
+.flight-slot.just-placed {
+  animation: flight-pop 0.45s ease;
+}
+@keyframes flight-pop {
+  0% { transform: scale(0.92); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.flight-touch-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  font-size: 2.2rem;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
+}
+
+.flight-power-wrap { flex: 1; min-width: 160px; }
+.flight-power-label { font-weight: 800; margin-bottom: 4px; }
+.flight-power-track {
+  height: 16px;
+  border-radius: 999px;
+  background: #e0e6f5;
+  overflow: hidden;
+  border: 2px solid #a29bfe;
+}
+.flight-power-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #55efc4, #fdcb6e, #ff7675);
+  transition: width 0.05s linear;
+}
+
+.flight-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  background: #111;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 3px solid #2d3436;
+  box-shadow: var(--shadow);
+}
+.flight-canvas-wrap canvas {
+  display: block;
+  max-width: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.flight-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.flight-flavor {
+  color: #6c5ce7;
+  font-style: italic;
+}
+
+.flight-dpad {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.flight-pad-mid {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.flight-pad-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  border: 3px solid #0984e3;
+  background: linear-gradient(180deg, #74b9ff, #0984e3);
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 4px 0 #0652dd;
+}
+.flight-pad-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #0652dd;
+}
+.flight-keys-hint { margin: 4px 0 0; }
+
+.flight-results-card { text-align: center; }
+
+#screen-flight.grade-prek .flight-part,
+#screen-flight.grade-prek .flight-slot {
+  min-height: 96px;
+}
+#screen-flight.grade-prek .flight-pad-btn {
+  width: 72px;
+  height: 72px;
+  font-size: 1.7rem;
+}
+#screen-flight.grade-prek .flight-keys-hint { display: none; }
+
+@media (max-width: 560px) {
+  .flight-build-pad { grid-template-columns: repeat(2, 1fr); }
+  .flight-pad-btn { width: 56px; height: 56px; }
+}

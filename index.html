@@ -18,7 +18,7 @@
         <div class="brand-logo" aria-hidden="true">🌈</div>
         <div>
           <h1>Kids Learning Lab</h1>
-          <div class="tagline">Type · Read · Spell · Math · Science · Code · Chess</div>
+          <div class="tagline">Type · Read · Spell · Math · Science · Code · Chess · Fly</div>
         </div>
       </div>
       <div class="top-actions">
@@ -86,6 +86,13 @@
             <span class="emoji">🐵</span>
             <span class="label">Monkey Code</span>
             <span class="hint">Bananas + chest · 12 jungle levels</span>
+          </button>
+        </div>
+        <div class="hub-card hub-card-flight" id="hub-flight-wrap">
+          <button type="button" class="btn btn-xl btn-flight" id="nav-flight">
+            <span class="emoji">✈️</span>
+            <span class="label">Space Fox Flyer</span>
+            <span class="hint">Build · launch · fly · Grade 2 fave</span>
           </button>
         </div>
         <div class="hub-card">
@@ -422,6 +429,95 @@
     </section>
   </div>
 
+
+    <!-- SPACE FOX FLYER -->
+    <section id="screen-flight" class="screen" aria-label="Space Fox Flyer">
+      <div class="panel-header">
+        <h2 id="flight-title">✈️ Space Fox Flyer</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div class="stars-display">⭐ <span class="stars-count">0</span></div>
+          <button type="button" class="btn btn-speak" id="flight-speak" title="Read aloud" aria-label="Read aloud">🔊</button>
+          <button type="button" class="btn btn-home" aria-label="Go home">🏠 Home</button>
+        </div>
+      </div>
+      <p id="flight-grade-tip" class="reading-grade-tip hidden"></p>
+      <p id="flight-prompt" class="level-info" aria-live="polite"></p>
+
+      <div id="flight-panel-menu" class="flight-panel">
+        <p class="section-sub">Pick a sky world, then build your flyer!</p>
+        <div id="flight-worlds" class="hub-grid flight-worlds"></div>
+      </div>
+
+      <div id="flight-panel-build" class="flight-panel hidden">
+        <div class="flight-build-toolbar">
+          <button type="button" class="btn btn-sm" id="flight-back-menu">◀ Worlds</button>
+          <span id="flight-build-status" class="flight-build-status">Need: body + wings + engine</span>
+          <button type="button" class="btn btn-lg btn-success" id="flight-start-flight" disabled>🚀 Start flight</button>
+        </div>
+        <div class="flight-presets-row">
+          <span class="flight-presets-label">Quick planes:</span>
+          <div id="flight-presets" class="flight-presets"></div>
+        </div>
+        <div class="flight-build-layout">
+          <div>
+            <p class="enter-hint">Drag parts (or tap) onto the pad</p>
+            <div id="flight-parts" class="flight-parts"></div>
+          </div>
+          <div class="flight-pad-wrap">
+            <div id="flight-plane-preview" class="flight-plane-preview" aria-hidden="true"></div>
+            <div id="flight-build-pad" class="flight-build-pad" aria-label="Build pad"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="flight-panel-launch" class="flight-panel hidden">
+        <div class="flight-build-toolbar">
+          <button type="button" class="btn btn-sm" id="flight-back-build">◀ Build</button>
+          <div class="flight-power-wrap">
+            <div id="flight-power-label" class="flight-power-label">Power: soft</div>
+            <div class="flight-power-track"><div id="flight-power-fill" class="flight-power-fill"></div></div>
+          </div>
+        </div>
+        <div class="flight-canvas-wrap">
+          <canvas id="flight-launch-canvas" width="640" height="360" aria-label="Pull-back launch"></canvas>
+        </div>
+      </div>
+
+      <div id="flight-panel-fly" class="flight-panel hidden">
+        <div class="flight-hud">
+          <span>⭐ Score <strong id="flight-score">0</strong></span>
+          <span>⭕ <strong id="flight-rings">0</strong></span>
+          <span>🌟 <strong id="flight-stars-got">0</strong></span>
+          <span id="flight-flavor" class="flight-flavor">Do a barrel roll!</span>
+        </div>
+        <div class="flight-canvas-wrap">
+          <canvas id="flight-fly-canvas" width="640" height="360" aria-label="Flight game"></canvas>
+        </div>
+        <div id="flight-dpad" class="flight-dpad" aria-label="Flight controls">
+          <button type="button" class="flight-pad-btn" data-dir="up" aria-label="Up">⬆️</button>
+          <div class="flight-pad-mid">
+            <button type="button" class="flight-pad-btn" data-dir="left" aria-label="Left">⬅️</button>
+            <button type="button" class="flight-pad-btn" data-dir="down" aria-label="Down">⬇️</button>
+            <button type="button" class="flight-pad-btn" data-dir="right" aria-label="Right">➡️</button>
+          </div>
+          <p class="enter-hint flight-keys-hint">Arrow keys or WASD</p>
+        </div>
+      </div>
+
+      <div id="flight-panel-results" class="flight-panel hidden">
+        <div class="card flight-results-card">
+          <div class="big-emoji">🦊</div>
+          <h3 id="flight-results-title">Flight complete!</h3>
+          <div id="flight-results-stars" class="stars-big">⭐</div>
+          <p id="flight-results-body"></p>
+          <div class="stem-controls" style="margin-top:12px;justify-content:center;">
+            <button type="button" class="btn btn-lg btn-success" id="flight-retry">🔧 Build again</button>
+            <button type="button" class="btn btn-lg btn-primary" id="flight-again">🗺️ Worlds</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
   <!-- Modal -->
   <div id="modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal">
@@ -490,6 +586,7 @@
   <script src="js/science.js"></script>
   <script src="js/stem.js"></script>
   <script src="js/chess.js"></script>
+  <script src="js/flight.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

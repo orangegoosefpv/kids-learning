@@ -27,7 +27,8 @@
       spelling: { completed: 0 },
       science: { completed: 0 },
       chess: { completed: 0, learned: [] },
-      stem: { level: 0, completed: [] }
+      stem: { level: 0, completed: [] },
+      flight: { completed: 0, bestScore: 0, unlockedWorlds: [0] }
     };
   }
 
@@ -96,7 +97,8 @@
       spelling: Object.assign({}, prog.spelling, saved.spelling || {}),
       science: Object.assign({}, prog.science, saved.science || {}),
       chess: Object.assign({}, prog.chess, saved.chess || {}),
-      stem: Object.assign({}, prog.stem, saved.stem || {})
+      stem: Object.assign({}, prog.stem, saved.stem || {}),
+      flight: Object.assign({}, prog.flight, saved.flight || {})
     });
 
     if (typeof saved.name === 'string' && saved.name.trim()) {
@@ -114,6 +116,10 @@
     if (!Array.isArray(out.chess.learned)) out.chess.learned = [];
     if (!out.stem) out.stem = { level: 0, completed: [] };
     if (!Array.isArray(out.stem.completed)) out.stem.completed = [];
+    if (!out.flight) out.flight = { completed: 0, bestScore: 0, unlockedWorlds: [0] };
+    if (!Array.isArray(out.flight.unlockedWorlds)) out.flight.unlockedWorlds = [0];
+    if (typeof out.flight.bestScore !== 'number') out.flight.bestScore = 0;
+    if (typeof out.flight.completed !== 'number') out.flight.completed = 0;
     return out;
   }
 
@@ -126,7 +132,8 @@
       spelling: Object.assign({}, prog.spelling, saved.spelling || {}),
       science: Object.assign({}, prog.science, saved.science || {}),
       chess: Object.assign({}, prog.chess, saved.chess || {}),
-      stem: Object.assign({}, prog.stem, saved.stem || {})
+      stem: Object.assign({}, prog.stem, saved.stem || {}),
+      flight: Object.assign({}, prog.flight, saved.flight || {})
     });
 
     if (typeof saved.name === 'string' && saved.name.trim()) {
@@ -156,6 +163,10 @@
     if (!out.chess) out.chess = { completed: 0, learned: [] };
     if (!Array.isArray(out.chess.learned)) out.chess.learned = [];
     if (!Array.isArray(out.stem.completed)) out.stem.completed = [];
+    if (!out.flight) out.flight = { completed: 0, bestScore: 0, unlockedWorlds: [0] };
+    if (!Array.isArray(out.flight.unlockedWorlds)) out.flight.unlockedWorlds = [0];
+    if (typeof out.flight.bestScore !== 'number') out.flight.bestScore = 0;
+    if (typeof out.flight.completed !== 'number') out.flight.completed = 0;
     return out;
   }
 
@@ -331,6 +342,7 @@
     if ((p.science && p.science.completed) || 0) return true;
     if ((p.chess && p.chess.completed) || 0) return true;
     if (p.stem && Array.isArray(p.stem.completed) && p.stem.completed.length) return true;
+    if (p.flight && ((p.flight.completed || 0) > 0 || (p.flight.bestScore || 0) > 0)) return true;
     return false;
   }
 
