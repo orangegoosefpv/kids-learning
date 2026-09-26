@@ -2266,18 +2266,44 @@ code {
 .flight-hud {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 16px;
+  gap: 8px 10px;
   align-items: center;
-  font-weight: 800;
-  margin-bottom: 8px;
+  font-weight: 900;
+  font-size: 1.05rem;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.82);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.55), 0 0 6px rgba(0,0,0,0.35);
+}
+.flight-hud-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.25);
+}
+.flight-hud-pill strong {
+  color: #ffeaa7;
+  font-size: 1.08em;
 }
 .flight-timer-pill {
-  background: #2d3436;
+  background: #111827;
   color: #ffeaa7;
-  padding: 4px 12px;
+  padding: 5px 12px;
   border-radius: 999px;
   border: 2px solid #fdcb6e;
   font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
 }
 .flight-timer-pill.flight-timer-low {
   background: #c0392b;
@@ -2286,17 +2312,20 @@ code {
   animation: flight-pulse 0.8s ease-in-out infinite;
 }
 .flight-flavor {
-  color: #6c5ce7;
+  color: #dff9fb !important;
   font-style: italic;
+  font-weight: 800;
+  max-width: 100%;
 }
 .flight-wave-hud {
   font-weight: 900;
-  padding: 4px 12px;
+  padding: 5px 12px;
   border-radius: 999px;
   border: 2px solid #55efc4;
   background: #55efc4;
-  color: #2d3436;
+  color: #111827 !important;
   font-variant-numeric: tabular-nums;
+  text-shadow: none;
 }
 .flight-hp-wrap {
   display: inline-flex;
@@ -2411,4 +2440,24 @@ code {
   .flight-pad-btn { width: 56px; height: 56px; }
   .flight-fire-btn { min-width: 96px; min-height: 96px; font-size: 1.1rem; }
   .flight-countdown-num { font-size: 3.6rem; }
+}
+
+
+/* Space Fox Flyer — play mode: keep canvas in view without scrolling past chrome */
+#screen-flight.flight-playing .panel-header,
+#screen-flight.flight-playing #flight-grade-tip,
+#screen-flight.flight-playing #flight-prompt {
+  display: none;
+}
+#screen-flight.flight-playing {
+  padding-top: 6px;
+}
+#screen-flight.flight-playing #flight-panel-fly {
+  scroll-margin-top: 8px;
+}
+#screen-flight.flight-playing .flight-canvas-wrap {
+  margin-top: 4px;
+}
+.flight-weapon-hud {
+  color: #fff;
 }

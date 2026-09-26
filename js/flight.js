@@ -1,8 +1,8 @@
 /* Space Fox Flyer — top-down arena shooter
-   Hangar shop · map upgrade stations · points · 7-min timed flights.
-   Waves · player HP · slow bright targets. Original kid-friendly game. */
+   Hangar shop · map upgrade stations · points · 4-min timed flights.
+   Waves · player HP · FPV/Shahed drones. Original kid-friendly game. */
 (function (global) {
-  const SESSION_SECONDS = 7 * 60;
+  const SESSION_SECONDS = 4 * 60;
   const QUESTIONS_TO_UNLOCK = 10;
   const GATE_SUBJECTS = ['Math', 'Reading', 'Spelling', 'Science'];
   /** Pull camera OUT so plane, bullets, and enemies are clearly visible. */
@@ -10,13 +10,14 @@
   const MAX_EQUIP_PERKS = 2;
   const PLAYER_MAX_HP = 5;
   const HIT_INVULN = 90; // frames (~1.5s) after a hit
-  /** Escalating waves across the 7-minute session (at = elapsed seconds). */
+  const WINGMEN_DURATION = 20; // friend-jets perk lifetime (seconds)
+  /** Escalating waves across the 4-minute session (at = elapsed seconds). */
   const WAVE_DEFS = [
     { id: 1, at: 0,   title: 'Wave 1', subtitle: 'Easy patrol',   speedMul: 0.42, densMul: 0.65, hp: 1,   shoot: 0,    boss: false, color: '#55efc4' },
-    { id: 2, at: 90,  title: 'Wave 2', subtitle: 'Medium swarm',  speedMul: 0.55, densMul: 0.95, hp: 1,   shoot: 0.12, boss: false, color: '#74b9ff' },
-    { id: 3, at: 180, title: 'Wave 3', subtitle: 'Hard chase',    speedMul: 0.68, densMul: 1.2,  hp: 1.5, shoot: 0.28, boss: false, color: '#ffeaa7' },
-    { id: 4, at: 300, title: 'Wave 4', subtitle: 'Heavy drones',  speedMul: 0.8,  densMul: 1.45, hp: 2,   shoot: 0.4,  boss: false, color: '#ff7675' },
-    { id: 5, at: 360, title: 'Wave 5', subtitle: 'Boss rush!',    speedMul: 0.9,  densMul: 1.15, hp: 3,   shoot: 0.5,  boss: true,  color: '#a29bfe' }
+    { id: 2, at: 60,  title: 'Wave 2', subtitle: 'Medium swarm',  speedMul: 0.55, densMul: 0.95, hp: 1,   shoot: 0.14, boss: false, color: '#74b9ff' },
+    { id: 3, at: 120, title: 'Wave 3', subtitle: 'Hard chase',    speedMul: 0.68, densMul: 1.2,  hp: 1.5, shoot: 0.3,  boss: false, color: '#ffeaa7' },
+    { id: 4, at: 180, title: 'Wave 4', subtitle: 'Heavy drones',  speedMul: 0.82, densMul: 1.4,  hp: 2,   shoot: 0.42, boss: false, color: '#ff7675' },
+    { id: 5, at: 215, title: 'Wave 5', subtitle: 'Boss rush!',    speedMul: 0.95, densMul: 1.2,  hp: 3,   shoot: 0.55, boss: true,  color: '#a29bfe' }
   ];
 
   const WORLDS = [
@@ -34,7 +35,7 @@
       enemies: 8,
       asteroids: 5,
       stars: 6,
-      enemyEmoji: '🛸',
+      enemyEmoji: '🚁',
       rockEmoji: '☁️',
       starEmoji: '⭐',
       bgBits: ['🌳', '🌼', '🏡', '🦋']
@@ -53,7 +54,7 @@
       enemies: 10,
       asteroids: 8,
       stars: 8,
-      enemyEmoji: '👾',
+      enemyEmoji: '🛸',
       rockEmoji: '🌑',
       starEmoji: '⭐',
       bgBits: ['✨', '🪐', '💫', '🌙']
@@ -72,7 +73,7 @@
       enemies: 9,
       asteroids: 6,
       stars: 7,
-      enemyEmoji: '🎈',
+      enemyEmoji: '✈️',
       rockEmoji: '🪨',
       starEmoji: '🌟',
       bgBits: ['☁️', '🌈', '🏝️', '🕊️']
@@ -125,7 +126,7 @@
       turn: 1.15,
       thrust: 1.25,
       fire: 1.25,
-      cost: 120,
+      cost: 200,
       tier: 2
     },
     {
@@ -137,7 +138,7 @@
       turn: 1.08,
       thrust: 1.18,
       fire: 1.35,
-      cost: 220,
+      cost: 380,
       tier: 3
     },
     {
@@ -149,22 +150,23 @@
       turn: 1.2,
       thrust: 1.3,
       fire: 1.4,
-      cost: 350,
+      cost: 600,
       tier: 4
     }
   ];
 
   const WEAPON_SHOP = [
-    { id: 'damage', label: 'Power Bolts', emoji: '💥', tip: 'Bigger boom damage', cost: 80, maxLevel: 3 },
-    { id: 'firerate', label: 'Quick Trigger', emoji: '⚡', tip: 'Shoot faster', cost: 100, maxLevel: 3 },
-    { id: 'multishot', label: 'Twin Cannons', emoji: '🎯', tip: 'Extra bullets', cost: 150, maxLevel: 2 }
+    { id: 'damage', label: 'Power Bolts', emoji: '💥', tip: 'Bigger boom damage', cost: 140, maxLevel: 3 },
+    { id: 'firerate', label: 'Quick Trigger', emoji: '⚡', tip: 'Shoot faster', cost: 160, maxLevel: 3 },
+    { id: 'multishot', label: 'Twin Cannons', emoji: '🎯', tip: 'Extra bullets', cost: 240, maxLevel: 2 }
   ];
 
   const PERK_SHOP = [
-    { id: 'speed', label: 'Speed Boost', emoji: '💨', tip: 'Zoom faster', cost: 60 },
-    { id: 'shield', label: 'Shield Pack', emoji: '🛡️', tip: 'Extra soft bump buffer', cost: 70 },
-    { id: 'magnet', label: 'Star Magnet', emoji: '🧲', tip: 'Pull nearby stars', cost: 90 },
-    { id: 'burst', label: 'Long Burst', emoji: '🌟', tip: 'Bullets fly farther', cost: 110 }
+    { id: 'speed', label: 'Speed Boost', emoji: '💨', tip: 'Zoom faster', cost: 100 },
+    { id: 'shield', label: 'Shield Pack', emoji: '🛡️', tip: 'Extra soft bump buffer', cost: 120 },
+    { id: 'magnet', label: 'Star Magnet', emoji: '🧲', tip: 'Pull nearby stars', cost: 140 },
+    { id: 'burst', label: 'Long Burst', emoji: '🌟', tip: 'Bullets fly farther', cost: 160 },
+    { id: 'wingmen', label: 'Friend Jets', emoji: '🛫', tip: 'Friendly jets fight with you ~20s', cost: 220 }
   ];
 
   /** Map landmarks — fly into / overlap to equip for this run. */
@@ -183,7 +185,7 @@
   let mode = 'menu'; // menu | build | countdown | fly | results
   let worldIdx = 0;
   let shipId = 'foxjet';
-  let equippedPerks = { speed: false, fire: false, shield: false, magnet: false, burst: false };
+  let equippedPerks = { speed: false, fire: false, shield: false, magnet: false, burst: false, wingmen: false };
   let raf = 0;
   let keys = {};
   let pad = { up: false, down: false, left: false, right: false, fire: false };
@@ -212,6 +214,9 @@
   let waveBannerTitle = '';
   let waveBannerSub = '';
   let waveBannerColor = '#55efc4';
+  let wingmen = [];
+  let wingmenLeft = 0;
+  let thrusting = false;
   let spawnClock = 0;
 
   function $(sel, root) {
@@ -234,13 +239,14 @@
 
   function difficulty() {
     // enemySpeed kept low so kids can see and dodge; waves scale it further.
+    // Thrust is snappy so W/↑ clearly accelerates along heading.
     if (grade === 'prek') {
-      return { thrust: 0.22, turn: 0.08, maxSpeed: 4.2, fireMs: 320, bulletSpeed: 9, enemySpeed: 0.45, hitPad: 10 };
+      return { thrust: 0.38, turn: 0.08, maxSpeed: 4.5, fireMs: 320, bulletSpeed: 9, enemySpeed: 0.45, hitPad: 10 };
     }
     if (grade === 'grade3') {
-      return { thrust: 0.28, turn: 0.1, maxSpeed: 5.6, fireMs: 220, bulletSpeed: 11, enemySpeed: 0.75, hitPad: 4 };
+      return { thrust: 0.48, turn: 0.1, maxSpeed: 6.0, fireMs: 220, bulletSpeed: 11, enemySpeed: 0.75, hitPad: 4 };
     }
-    return { thrust: 0.25, turn: 0.09, maxSpeed: 5, fireMs: 260, bulletSpeed: 10, enemySpeed: 0.6, hitPad: 6 };
+    return { thrust: 0.42, turn: 0.09, maxSpeed: 5.4, fireMs: 260, bulletSpeed: 10, enemySpeed: 0.6, hitPad: 6 };
   }
 
   function waveDef(idx) {
@@ -256,8 +262,10 @@
   }
 
   function enemyTint(kind, boss) {
-    if (boss) return { fill: 'rgba(162,155,254,0.55)', ring: '#ffeaa7', glow: '#a29bfe' };
+    if (boss) return { fill: 'rgba(45,52,54,0.85)', ring: '#ffeaa7', glow: '#a29bfe' };
     if (kind === 'asteroid') return { fill: 'rgba(255,159,67,0.5)', ring: '#fff', glow: '#ff9f43' };
+    if (kind === 'shahed') return { fill: 'rgba(45,52,54,0.9)', ring: '#ff7675', glow: '#e17055' };
+    if (kind === 'fpv') return { fill: 'rgba(45,52,54,0.85)', ring: '#74b9ff', glow: '#0984e3' };
     return { fill: 'rgba(255,118,117,0.55)', ring: '#fff', glow: '#ff6b6b' };
   }
 
@@ -269,7 +277,7 @@
       questionsTowardUnlock: 0,
       flightLocked: false,
       lastShipId: 'foxjet',
-      lastUpgrades: { speed: false, fire: false, shield: false, magnet: false, burst: false },
+      lastUpgrades: { speed: false, fire: false, shield: false, magnet: false, burst: false, wingmen: false },
       points: 0,
       ownedShips: ['scout', 'zippy', 'foxjet'],
       weaponLevels: { damage: 0, firerate: 0, multishot: 0 },
@@ -292,7 +300,7 @@
     if (typeof base.flightLocked !== 'boolean') base.flightLocked = !!base.flightLocked;
     if (!base.lastShipId) base.lastShipId = 'foxjet';
     if (!base.lastUpgrades || typeof base.lastUpgrades !== 'object') {
-      base.lastUpgrades = { speed: false, fire: false, shield: false, magnet: false, burst: false };
+      base.lastUpgrades = { speed: false, fire: false, shield: false, magnet: false, burst: false, wingmen: false };
     }
     if (typeof base.points !== 'number' || base.points < 0) base.points = Math.max(0, Number(base.points) || 0);
     if (!Array.isArray(base.ownedShips)) base.ownedShips = ['scout', 'zippy', 'foxjet'];
@@ -309,7 +317,7 @@
     if (!Array.isArray(base.ownedPerks)) base.ownedPerks = [];
     // Migrate old free-toggle boosts into owned perks if they were ever selected
     const lu = base.lastUpgrades || {};
-    ['speed', 'shield', 'magnet', 'burst'].forEach(id => {
+    ['speed', 'shield', 'magnet', 'burst', 'wingmen'].forEach(id => {
       if (lu[id] && !base.ownedPerks.includes(id)) base.ownedPerks.push(id);
     });
     if (lu.fire && (base.weaponLevels.firerate || 0) < 1) base.weaponLevels.firerate = 1;
@@ -347,6 +355,20 @@
       if (el) el.classList.toggle('hidden', m !== name);
     });
     mode = name;
+    const screen = $('#screen-flight');
+    if (screen) {
+      screen.classList.toggle('flight-playing', name === 'fly' || name === 'countdown');
+    }
+  }
+
+  function scrollPlayIntoView() {
+    const stage = $('#flight-panel-fly') || $('#flight-fly-canvas');
+    if (!stage || !stage.scrollIntoView) return;
+    try {
+      stage.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+    } catch (err) {
+      stage.scrollIntoView(true);
+    }
   }
 
   function stopLoop() {
@@ -432,7 +454,7 @@
       ? `Fly time's up! Answer ${QUESTIONS_TO_UNLOCK} questions (Science / Math / Reading / Spelling) to unlock more flight.`
       : (isPrek()
         ? 'Pick a world, visit the hangar shop, then blast soft targets!'
-        : 'Top-down flyer · hangar shop · map upgrade pads · 7 minutes!');
+        : 'Top-down flyer · hangar shop · map upgrade pads · 4 minutes!');
     setPrompt(tip);
     const badge = $('#flight-grade-tip');
     if (badge) {
@@ -460,10 +482,11 @@
       fire: false,
       shield: !!(lu.shield && prog.ownedPerks.includes('shield')),
       magnet: !!(lu.magnet && prog.ownedPerks.includes('magnet')),
-      burst: !!(lu.burst && prog.ownedPerks.includes('burst'))
+      burst: !!(lu.burst && prog.ownedPerks.includes('burst')),
+      wingmen: !!(lu.wingmen && prog.ownedPerks.includes('wingmen'))
     };
     while (perkEquippedCount() > MAX_EQUIP_PERKS) {
-      const order = ['burst', 'magnet', 'shield', 'speed'];
+      const order = ['burst', 'magnet', 'shield', 'speed', 'wingmen'];
       for (const id of order) {
         if (equippedPerks[id]) { equippedPerks[id] = false; break; }
       }
@@ -698,7 +721,8 @@
         fire: false,
         shield: !!equippedPerks.shield,
         magnet: !!equippedPerks.magnet,
-        burst: !!equippedPerks.burst
+        burst: !!equippedPerks.burst,
+        wingmen: !!equippedPerks.wingmen
       }
     });
   }
@@ -728,6 +752,7 @@
     updateHud();
     setPrompt('Get ready…');
     showPanel('countdown');
+    scrollPlayIntoView();
     const num = $('#flight-countdown-num');
     const msg = $('#flight-countdown-msg');
     let cn = 3;
@@ -807,9 +832,33 @@
     waveBannerT = 2.8;
     entities = spawnArena(wd, arena, w0);
     cam = { x: plane.x, y: plane.y };
-    keys = {};
+    // Do NOT wipe keys here — kid may already be holding W/↑ during countdown.
     pad = { up: false, down: false, left: false, right: false, fire: false };
     fireHeld = false;
+    thrusting = false;
+    wingmen = [];
+    wingmenLeft = 0;
+  }
+
+  function summonWingmen() {
+    wingmen = [];
+    wingmenLeft = 0;
+    if (!plane || !equippedPerks.wingmen) return;
+    wingmenLeft = WINGMEN_DURATION;
+    const offsets = [-55, 55];
+    offsets.forEach((off, i) => {
+      wingmen.push({
+        x: plane.x + Math.cos(plane.angle + Math.PI / 2) * off,
+        y: plane.y + Math.sin(plane.angle + Math.PI / 2) * off,
+        vx: 0,
+        vy: 0,
+        angle: plane.angle,
+        fireCd: 0.4 + i * 0.2,
+        color: i === 0 ? '#55efc4' : '#74b9ff',
+        r: 14
+      });
+    });
+    flavor = '🛫 Friend jets inbound — they help for ~20 seconds!';
   }
 
   function beginFlight() {
@@ -821,8 +870,12 @@
     sessionLeft = SESSION_SECONDS;
     sessionStartedAt = performance.now();
     lastTs = performance.now();
+    summonWingmen();
     setPrompt(`${world().emoji} ${world().name} · ${flavor}`);
     updateHud();
+    scrollPlayIntoView();
+    // Focus canvas so keyboard thrust works immediately (no stray button focus).
+    try { canvas.setAttribute('tabindex', '-1'); canvas.focus({ preventScroll: true }); } catch (err) { /* */ }
     stopLoop();
     raf = requestAnimationFrame(tickFly);
   }
@@ -859,31 +912,46 @@
     };
   }
 
+  function pickEnemyKind(wave, boss) {
+    if (boss) return 'shahed'; // heavy Shahed mothership silhouette
+    const wid = (wave && wave.id) || 1;
+    // Early waves lean FPV quadcopters; later mix in Shahed loitering munitions
+    if (wid <= 2) return Math.random() < 0.75 ? 'fpv' : 'shahed';
+    if (wid === 3) return Math.random() < 0.5 ? 'fpv' : 'shahed';
+    return Math.random() < 0.35 ? 'fpv' : 'shahed';
+  }
+
   function makeEnemy(wd, x, y, wave, opts) {
     const o = opts || {};
     const boss = !!o.boss || !!(wave && wave.boss && o.forceBoss);
     const ang = Math.random() * Math.PI * 2;
     const speedMul = (wave && wave.speedMul) || 0.5;
     const baseSpd = (0.25 + Math.random() * 0.45) * speedMul;
-    const tint = enemyTint('enemy', boss);
+    const kind = o.kind || pickEnemyKind(wave, boss);
+    const tint = enemyTint(kind, boss);
     const hpBase = (wave && wave.hp) || 1;
-    const hp = boss ? Math.max(6, Math.ceil(hpBase * 4)) : Math.max(1, Math.ceil(hpBase));
+    // Boss: chunky HP so Wave 5 needs practice (still beatable for Grade 2)
+    const hp = boss ? Math.max(22, Math.ceil(hpBase * 9)) : Math.max(1, Math.ceil(hpBase));
     return {
       type: 'enemy',
       x, y,
       vx: Math.cos(ang) * baseSpd,
       vy: Math.sin(ang) * baseSpd,
-      r: boss ? (isPrek() ? 48 : 42) : (isPrek() ? 34 : 30),
-      emoji: boss ? '👹' : wd.enemyEmoji,
+      r: boss ? (isPrek() ? 56 : 50) : (isPrek() ? 32 : 28),
+      emoji: boss ? '🛸' : (kind === 'shahed' ? '🛩️' : '🚁'),
+      kind,
       hp,
       maxHp: hp,
-      points: boss ? 80 : (12 + Math.round(hp * 6)),
+      // Coin nerf ~1/3–1/4 of prior rewards
+      points: boss ? 28 : (4 + Math.round(hp * 2)),
       boss,
-      shootCd: 1.2 + Math.random() * 1.5,
+      helper: !!o.helper,
+      shootCd: boss ? 0.55 + Math.random() * 0.35 : (1.2 + Math.random() * 1.5),
       canShoot: !!(wave && wave.shoot > 0) || boss,
-      shootChance: boss ? Math.max(0.55, (wave && wave.shoot) || 0.5) : ((wave && wave.shoot) || 0),
+      shootChance: boss ? 0.9 : ((wave && wave.shoot) || 0),
       tint,
-      pulse: Math.random() * Math.PI * 2
+      pulse: Math.random() * Math.PI * 2,
+      propSpin: Math.random() * Math.PI * 2
     };
   }
 
@@ -902,7 +970,7 @@
       emoji: wd.rockEmoji,
       hp,
       maxHp: hp,
-      points: 8 + hp * 4,
+      points: 3 + hp,
       spin: (Math.random() - 0.5) * 0.03,
       tint,
       pulse: Math.random() * Math.PI * 2
@@ -974,7 +1042,7 @@
         r: isPrek() ? 28 : 24,
         emoji: wd.starEmoji,
         got: false,
-        points: 25,
+        points: 8,
         bob: Math.random() * Math.PI * 2
       });
     }
@@ -1004,7 +1072,7 @@
       r: isPrek() ? 28 : 24,
       emoji: wd.starEmoji,
       got: false,
-      points: 25,
+      points: 8,
       bob: Math.random() * Math.PI * 2
     };
   }
@@ -1037,8 +1105,13 @@
     }
     if (wv.boss) {
       const p = randAway(arena, 120, 320);
-      entities.push(makeEnemy(wd, p.x, p.y, wv, { forceBoss: true }));
-      flavor = '👹 Mini-boss on the map — big glow, big points!';
+      entities.push(makeEnemy(wd, p.x, p.y, wv, { forceBoss: true, kind: 'shahed' }));
+      // Escort helpers — small FPV drones that swarm with the boss
+      for (let h = 0; h < 3; h++) {
+        const hp = randAway(arena, 100, 240);
+        entities.push(makeEnemy(wd, hp.x, hp.y, wv, { kind: 'fpv', helper: true }));
+      }
+      flavor = '🛸 Heavy Shahed boss + escort drones — stay sharp!';
     }
   }
 
@@ -1165,34 +1238,68 @@
     spawnSparks(e.x, e.y, e.color || '#ffeaa7', 14);
     if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
     // Small point bonus for visiting
-    addScore(5);
+    addScore(2);
+  }
+
+  function inputHeld(names) {
+    for (let i = 0; i < names.length; i++) {
+      if (keys[names[i]]) return true;
+    }
+    return false;
+  }
+
+  function wantsThrust() {
+    // Prefer e.code aliases (KeyW/ArrowUp) so layout / Shift / Caps Lock cannot break thrust.
+    return !!(
+      pad.up ||
+      inputHeld(['ArrowUp', 'Up', 'KeyW', 'w', 'W', 'thrust'])
+    );
+  }
+
+  function wantsBrake() {
+    return !!(
+      pad.down ||
+      inputHeld(['ArrowDown', 'Down', 'KeyS', 's', 'S', 'brake'])
+    );
+  }
+
+  function wantsTurnLeft() {
+    return !!(pad.left || inputHeld(['ArrowLeft', 'Left', 'KeyA', 'a', 'A']));
+  }
+
+  function wantsTurnRight() {
+    return !!(pad.right || inputHeld(['ArrowRight', 'Right', 'KeyD', 'd', 'D']));
   }
 
   function stepPhysics(viewW, viewH, dt) {
     const wd = world();
     const arena = wd.arena;
     const diff = difficulty();
-    const turnL = keys.ArrowLeft || keys.a || keys.A || pad.left;
-    const turnR = keys.ArrowRight || keys.d || keys.D || pad.right;
-    const thrust = keys.ArrowUp || keys.w || keys.W || pad.up;
-    const brake = keys.ArrowDown || keys.s || keys.S || pad.down;
+    const turnL = wantsTurnLeft();
+    const turnR = wantsTurnRight();
+    const thrust = wantsThrust();
+    const brake = wantsBrake() && !thrust; // thrust wins over brake if both held
+    thrusting = !!thrust;
 
     if (turnL) plane.angle -= plane.turn * (dt * 60);
     if (turnR) plane.angle += plane.turn * (dt * 60);
 
+    // Accelerate forward along heading — reliable with keyboard + on-screen pad.
     if (thrust) {
-      plane.vx += Math.cos(plane.angle) * plane.thrust * (dt * 60);
-      plane.vy += Math.sin(plane.angle) * plane.thrust * (dt * 60);
+      const accel = plane.thrust * (dt * 60);
+      plane.vx += Math.cos(plane.angle) * accel;
+      plane.vy += Math.sin(plane.angle) * accel;
     }
     if (brake) {
-      plane.vx *= Math.pow(0.92, dt * 60);
-      plane.vy *= Math.pow(0.92, dt * 60);
+      plane.vx *= Math.pow(0.9, dt * 60);
+      plane.vy *= Math.pow(0.9, dt * 60);
       plane.vx -= Math.cos(plane.angle) * plane.thrust * 0.35 * (dt * 60);
       plane.vy -= Math.sin(plane.angle) * plane.thrust * 0.35 * (dt * 60);
     }
 
-    plane.vx *= Math.pow(0.985, dt * 60);
-    plane.vy *= Math.pow(0.985, dt * 60);
+    // Lighter drag so thrust coast feels responsive (was 0.985 — felt stuck).
+    plane.vx *= Math.pow(0.992, dt * 60);
+    plane.vy *= Math.pow(0.992, dt * 60);
 
     const spd = Math.hypot(plane.vx, plane.vy);
     if (spd > plane.maxSpeed) {
@@ -1269,7 +1376,7 @@
             entities.splice(j, 1);
             if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
             flavor = wasBoss
-              ? '👹 Boss down — amazing!'
+              ? '🛸 Boss down — amazing!'
               : (kind === 'enemy' ? 'Drone down — nice shot!' : 'Rock blasted — soft pop!');
           } else {
             spawnSparks(e.x, e.y, '#ffeaa7', 4);
@@ -1307,20 +1414,31 @@
           const dy = plane.y - e.y;
           const dist = Math.hypot(dx, dy) || 1;
           const wv = waveDef(currentWaveIdx);
-          const chase = diff.enemySpeed * wv.speedMul * 0.012 * (dt * 60);
+          const bossMul = e.boss ? 2.15 : (e.helper ? 1.35 : 1);
+          const chase = diff.enemySpeed * wv.speedMul * 0.012 * bossMul * (dt * 60);
           e.vx += (dx / dist) * chase;
           e.vy += (dy / dist) * chase;
           const es = Math.hypot(e.vx, e.vy);
-          const maxE = diff.enemySpeed * wv.speedMul * (isPrek() ? 1.15 : 1.55) * (e.boss ? 1.25 : 1);
+          const maxE = diff.enemySpeed * wv.speedMul * (isPrek() ? 1.15 : 1.55) * (e.boss ? 2.4 : (e.helper ? 1.7 : 1));
           if (es > maxE) {
             e.vx = (e.vx / es) * maxE;
             e.vy = (e.vy / es) * maxE;
           }
+          // Face travel / chase direction for silhouette drawing
+          e.angle = Math.atan2(e.vy, e.vx);
+          e.propSpin = (e.propSpin || 0) + dt * (e.kind === 'fpv' ? 14 : 4);
           if (e.canShoot && e.shootChance > 0) {
             e.shootCd = (e.shootCd || 1.5) - dt;
-            if (e.shootCd <= 0 && dist < 520) {
-              e.shootCd = e.boss ? 1.4 : (2.4 + Math.random() * 1.6);
-              if (Math.random() < e.shootChance) fireEnemyShot(e);
+            if (e.shootCd <= 0 && dist < (e.boss ? 640 : 520)) {
+              e.shootCd = e.boss ? 0.55 : (2.2 + Math.random() * 1.5);
+              if (Math.random() < e.shootChance) {
+                fireEnemyShot(e);
+                if (e.boss) {
+                  // Boss volley — extra angled shots
+                  fireEnemyShot(e, -0.22);
+                  fireEnemyShot(e, 0.22);
+                }
+              }
             }
           }
         }
@@ -1381,6 +1499,8 @@
       }
     }
 
+    stepWingmen(dt, arena, diff);
+
     maintainWaveSpawns(dt);
 
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -1428,17 +1548,82 @@
     hurtPlayer(1, e);
   }
 
-  function fireEnemyShot(e) {
+  function stepWingmen(dt, arena, diff) {
+    if (!plane) { wingmen = []; wingmenLeft = 0; return; }
+    if (wingmenLeft <= 0 || !wingmen.length) {
+      if (wingmen.length && wingmenLeft <= 0) {
+        flavor = '🛫 Friend jets peeling off — fly safe!';
+        spawnSparks(plane.x, plane.y, '#55efc4', 10);
+      }
+      wingmen = [];
+      wingmenLeft = 0;
+      return;
+    }
+    wingmenLeft = Math.max(0, wingmenLeft - dt);
+    const slots = [-48, 48];
+    for (let i = 0; i < wingmen.length; i++) {
+      const w = wingmen[i];
+      const slot = slots[i % slots.length];
+      const tx = plane.x + Math.cos(plane.angle + Math.PI / 2) * slot - Math.cos(plane.angle) * 28;
+      const ty = plane.y + Math.sin(plane.angle + Math.PI / 2) * slot - Math.sin(plane.angle) * 28;
+      w.vx += (tx - w.x) * 0.08 * (dt * 60);
+      w.vy += (ty - w.y) * 0.08 * (dt * 60);
+      w.vx *= Math.pow(0.9, dt * 60);
+      w.vy *= Math.pow(0.9, dt * 60);
+      w.x += w.vx * (dt * 60);
+      w.y += w.vy * (dt * 60);
+      w.angle = plane.angle;
+      w.fireCd = (w.fireCd || 0) - dt;
+      if (w.fireCd <= 0) {
+        // Shoot nearest hostile
+        let best = null;
+        let bestD = 420;
+        for (const e of entities) {
+          if (e.type !== 'enemy' && e.type !== 'asteroid') continue;
+          if (e.hp <= 0) continue;
+          const d = Math.hypot(e.x - w.x, e.y - w.y);
+          if (d < bestD) { bestD = d; best = e; }
+        }
+        if (best) {
+          const ang = Math.atan2(best.y - w.y, best.x - w.x);
+          const spd = (diff.bulletSpeed || 10) * 0.85;
+          bullets.push({
+            x: w.x + Math.cos(ang) * (w.r + 4),
+            y: w.y + Math.sin(ang) * (w.r + 4),
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd,
+            r: 5,
+            life: 1.0,
+            color: w.color,
+            damage: 1,
+            seek: false,
+            friendly: true
+          });
+          w.fireCd = 0.45;
+        } else {
+          w.fireCd = 0.25;
+        }
+      }
+      // Soft clamp inside arena
+      const er = w.r + 4;
+      if (w.x < er) w.x = er;
+      if (w.y < er) w.y = er;
+      if (w.x > arena - er) w.x = arena - er;
+      if (w.y > arena - er) w.y = arena - er;
+    }
+  }
+
+  function fireEnemyShot(e, angOff) {
     if (!plane) return;
-    const ang = Math.atan2(plane.y - e.y, plane.x - e.x);
-    const spd = e.boss ? 2.1 : 1.55;
+    const ang = Math.atan2(plane.y - e.y, plane.x - e.x) + (angOff || 0);
+    const spd = e.boss ? 2.85 : 1.55;
     enemyBullets.push({
       x: e.x,
       y: e.y,
       vx: Math.cos(ang) * spd,
       vy: Math.sin(ang) * spd,
-      r: e.boss ? 12 : 9,
-      life: 3.2,
+      r: e.boss ? 13 : 9,
+      life: e.boss ? 3.6 : 3.2,
       color: e.boss ? '#a29bfe' : '#ff7675'
     });
   }
@@ -1609,43 +1794,46 @@
       const bobY = e.type === 'star' ? Math.sin(e.bob || 0) * 4 : 0;
       ctx.save();
       ctx.translate(e.x, e.y + bobY);
-      if (e.angle) ctx.rotate(e.angle);
-      if (e.type === 'enemy' || e.type === 'asteroid') {
-        const tint = e.tint || enemyTint(e.type, e.boss);
-        const pulse = 0.55 + Math.sin(e.pulse || 0) * 0.35;
-        ctx.beginPath();
-        ctx.fillStyle = tint.fill;
-        ctx.globalAlpha = 0.35 + pulse * 0.35;
-        ctx.arc(0, 0, e.r + 10, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.beginPath();
-        ctx.fillStyle = tint.fill;
-        ctx.arc(0, 0, e.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = tint.ring;
-        ctx.lineWidth = e.boss ? 5 : 3.5;
-        ctx.shadowColor = tint.glow;
-        ctx.shadowBlur = 14 + pulse * 10;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        // Dark inner outline for clarity
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-        ctx.lineWidth = 2;
-        ctx.arc(0, 0, e.r - 1, 0, Math.PI * 2);
-        ctx.stroke();
-        const fontPx = Math.round(e.r * (e.boss ? 1.55 : 1.7));
-        ctx.font = `${fontPx}px serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(e.emoji, 0, 0);
+      if (e.type === 'enemy') {
+        drawHostileDrone(ctx, e);
         if (e.maxHp && e.maxHp > 1) {
           const bw = e.r * 1.6;
           const pct = Math.max(0, e.hp / e.maxHp);
           ctx.fillStyle = 'rgba(0,0,0,0.45)';
           ctx.fillRect(-bw / 2, -e.r - 14, bw, 6);
           ctx.fillStyle = e.boss ? '#ffeaa7' : '#55efc4';
+          ctx.fillRect(-bw / 2, -e.r - 14, bw * pct, 6);
+        }
+      } else if (e.type === 'asteroid') {
+        const tint = e.tint || enemyTint('asteroid', false);
+        const pulse = 0.55 + Math.sin(e.pulse || 0) * 0.35;
+        if (e.angle) ctx.rotate(e.angle);
+        ctx.beginPath();
+        ctx.fillStyle = tint.fill;
+        ctx.globalAlpha = 0.4 + pulse * 0.3;
+        ctx.arc(0, 0, e.r + 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.fillStyle = '#636e72';
+        ctx.strokeStyle = tint.ring;
+        ctx.lineWidth = 3;
+        ctx.moveTo(e.r * 0.9, 0);
+        for (let i = 1; i <= 7; i++) {
+          const a = (i / 7) * Math.PI * 2;
+          const rr = e.r * (0.7 + ((i % 2) * 0.25));
+          ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (e.maxHp && e.maxHp > 1) {
+          const bw = e.r * 1.6;
+          const pct = Math.max(0, e.hp / e.maxHp);
+          ctx.rotate(-(e.angle || 0));
+          ctx.fillStyle = 'rgba(0,0,0,0.45)';
+          ctx.fillRect(-bw / 2, -e.r - 14, bw, 6);
+          ctx.fillStyle = '#55efc4';
           ctx.fillRect(-bw / 2, -e.r - 14, bw * pct, 6);
         }
       } else {
@@ -1665,6 +1853,11 @@
         }
       }
       ctx.restore();
+    }
+
+    // Friend jets (wingmen)
+    for (const w of wingmen) {
+      drawFriendJet(ctx, w);
     }
 
     for (const b of bullets) {
@@ -1710,13 +1903,26 @@
 
     if (plane) {
       const blink = plane.invuln > 0 && (Math.floor(plane.invuln) % 6 < 3);
-      if (!blink) drawPlaneTopDown(ctx, plane.x, plane.y, plane.angle);
+      if (!blink) drawPlaneTopDown(ctx, plane.x, plane.y, plane.angle, thrusting);
       if (plane.shield > 0) {
         ctx.beginPath();
         ctx.strokeStyle = 'rgba(116,185,255,0.65)';
         ctx.lineWidth = 3;
         ctx.arc(plane.x, plane.y, plane.r + 8, 0, Math.PI * 2);
         ctx.stroke();
+      }
+      // Wingmen timer chip near player
+      if (wingmenLeft > 0) {
+        ctx.save();
+        ctx.font = 'bold 13px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        const label = `🛫 ${Math.ceil(wingmenLeft)}s`;
+        const tw = ctx.measureText(label).width + 14;
+        ctx.fillRect(plane.x - tw / 2, plane.y - plane.r - 34, tw, 18);
+        ctx.fillStyle = '#55efc4';
+        ctx.fillText(label, plane.x, plane.y - plane.r - 21);
+        ctx.restore();
       }
     }
 
@@ -1757,11 +1963,174 @@
     }
   }
 
-  function drawPlaneTopDown(ctx, x, y, angle) {
+  function drawHostileDrone(ctx, e) {
+    const tint = e.tint || enemyTint(e.kind || 'fpv', e.boss);
+    const pulse = 0.55 + Math.sin(e.pulse || 0) * 0.35;
+    const ang = e.angle || 0;
+    ctx.save();
+    // Soft hostile glow
+    ctx.beginPath();
+    ctx.fillStyle = tint.glow;
+    ctx.globalAlpha = 0.2 + pulse * 0.25;
+    ctx.arc(0, 0, e.r + 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.rotate(ang);
+    if (e.kind === 'shahed' || e.boss) {
+      // Shahed-style delta / winged loitering munition
+      const s = e.boss ? 1.35 : 1;
+      ctx.fillStyle = e.boss ? '#2d3436' : '#1e272e';
+      ctx.strokeStyle = tint.ring;
+      ctx.lineWidth = e.boss ? 3.5 : 2.5;
+      ctx.beginPath();
+      ctx.moveTo(e.r * 1.15 * s, 0);
+      ctx.lineTo(-e.r * 0.55 * s, e.r * 0.95 * s);
+      ctx.lineTo(-e.r * 0.25 * s, 0);
+      ctx.lineTo(-e.r * 0.55 * s, -e.r * 0.95 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Wing tips
+      ctx.fillStyle = '#ff7675';
+      ctx.beginPath();
+      ctx.moveTo(-e.r * 0.15 * s, e.r * 0.55 * s);
+      ctx.lineTo(-e.r * 0.55 * s, e.r * 0.95 * s);
+      ctx.lineTo(-e.r * 0.35 * s, e.r * 0.35 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-e.r * 0.15 * s, -e.r * 0.55 * s);
+      ctx.lineTo(-e.r * 0.55 * s, -e.r * 0.95 * s);
+      ctx.lineTo(-e.r * 0.35 * s, -e.r * 0.35 * s);
+      ctx.closePath();
+      ctx.fill();
+      // Nose cone
+      ctx.fillStyle = e.boss ? '#ffeaa7' : '#dfe6e9';
+      ctx.beginPath();
+      ctx.moveTo(e.r * 1.15 * s, 0);
+      ctx.lineTo(e.r * 0.55 * s, 5 * s);
+      ctx.lineTo(e.r * 0.55 * s, -5 * s);
+      ctx.closePath();
+      ctx.fill();
+      if (e.boss) {
+        // Mothership twin engine glow
+        ctx.fillStyle = '#a29bfe';
+        ctx.globalAlpha = 0.7 + pulse * 0.3;
+        ctx.beginPath();
+        ctx.arc(-e.r * 0.45, 10, 5, 0, Math.PI * 2);
+        ctx.arc(-e.r * 0.45, -10, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      // FPV quadcopter — central body + 4 spinning props
+      const body = e.r * 0.42;
+      ctx.fillStyle = '#2d3436';
+      ctx.strokeStyle = tint.ring;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.rect(-body, -body * 0.7, body * 2, body * 1.4);
+      ctx.fill();
+      ctx.stroke();
+      // Arms
+      const arm = e.r * 0.85;
+      ctx.strokeStyle = '#636e72';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-arm, -arm); ctx.lineTo(arm, arm);
+      ctx.moveTo(-arm, arm); ctx.lineTo(arm, -arm);
+      ctx.stroke();
+      // Props
+      const spin = e.propSpin || 0;
+      const props = [[-arm, -arm], [arm, -arm], [-arm, arm], [arm, arm]];
+      props.forEach((p, i) => {
+        ctx.save();
+        ctx.translate(p[0], p[1]);
+        ctx.rotate(spin + i * 0.4);
+        ctx.strokeStyle = '#74b9ff';
+        ctx.globalAlpha = 0.85;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, e.r * 0.38, e.r * 0.12, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, 0, e.r * 0.12, e.r * 0.38, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#dfe6e9';
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+      // Camera dome
+      ctx.fillStyle = '#00cec9';
+      ctx.beginPath();
+      ctx.arc(body * 0.55, 0, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawFriendJet(ctx, w) {
+    ctx.save();
+    ctx.translate(w.x, w.y);
+    ctx.rotate(w.angle || 0);
+    // Friendly teal/blue fighter silhouette
+    ctx.fillStyle = w.color || '#55efc4';
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(16, 0);
+    ctx.lineTo(-10, 8);
+    ctx.lineTo(-6, 0);
+    ctx.lineTo(-10, -8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.moveTo(2, 0);
+    ctx.lineTo(-4, 12);
+    ctx.lineTo(-7, 0);
+    ctx.lineTo(-4, -12);
+    ctx.closePath();
+    ctx.fill();
+    // Soft friendly ring so kids know "good guy"
+    ctx.rotate(-(w.angle || 0));
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(85,239,196,0.55)';
+    ctx.lineWidth = 2;
+    ctx.arc(0, 0, w.r + 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPlaneTopDown(ctx, x, y, angle, isThrusting) {
     const sh = ship();
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
+    if (isThrusting) {
+      // Exhaust flame — visual proof thrust is firing
+      const flicker = 0.75 + Math.random() * 0.5;
+      ctx.fillStyle = '#ffeaa7';
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(-10, -5);
+      ctx.lineTo(-18 - 10 * flicker, 0);
+      ctx.lineTo(-10, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ff7675';
+      ctx.beginPath();
+      ctx.moveTo(-10, -3);
+      ctx.lineTo(-14 - 6 * flicker, 0);
+      ctx.lineTo(-10, 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
     ctx.fillStyle = sh.color;
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 2;
@@ -1815,6 +2184,12 @@
       ctx.fillStyle = e.type === 'star' ? '#ffd93d' : (e.type === 'enemy' ? '#ff7675' : '#dfe6e9');
       ctx.fillRect(mx + e.x * scale - 1.5, my + e.y * scale - 1.5, 3, 3);
     }
+    for (const w of wingmen) {
+      ctx.fillStyle = w.color || '#55efc4';
+      ctx.beginPath();
+      ctx.arc(mx + w.x * scale, my + w.y * scale, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
     if (plane) {
       ctx.fillStyle = ship().color;
       ctx.beginPath();
@@ -1862,7 +2237,8 @@
         fire: false,
         shield: !!equippedPerks.shield,
         magnet: !!equippedPerks.magnet,
-        burst: !!equippedPerks.burst
+        burst: !!equippedPerks.burst,
+        wingmen: !!equippedPerks.wingmen
       }
     };
 
@@ -1912,18 +2288,38 @@
     );
   }
 
+  function setFlightKey(e, down) {
+    // Store both code and key so thrust never depends on keyboard layout / shift.
+    if (e.code) keys[e.code] = down;
+    if (e.key) keys[e.key] = down;
+    if (e.code === 'ArrowUp' || e.key === 'ArrowUp' || e.code === 'KeyW') keys.thrust = down;
+    if (e.code === 'ArrowDown' || e.key === 'ArrowDown' || e.code === 'KeyS') keys.brake = down;
+  }
+
   function onKeyDown(e) {
-    if (mode !== 'fly') return;
-    keys[e.key] = true;
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
-    if (e.key === ' ' || e.code === 'Space') {
+    // Record during countdown too so holding W/↑ at GO actually thrusts.
+    if (mode !== 'fly' && mode !== 'countdown') return;
+    setFlightKey(e, true);
+    const block = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'w', 'W', 'a', 'A', 's', 'S', 'd', 'D'];
+    if (block.includes(e.key) || ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) {
+      e.preventDefault();
+    }
+    if (mode === 'fly' && (e.key === ' ' || e.code === 'Space')) {
       fireHeld = true;
       e.preventDefault();
     }
   }
   function onKeyUp(e) {
-    keys[e.key] = false;
+    if (mode !== 'fly' && mode !== 'countdown') return;
+    setFlightKey(e, false);
     if (e.key === ' ' || e.code === 'Space') fireHeld = false;
+  }
+
+  function onWindowBlur() {
+    keys = {};
+    pad = { up: false, down: false, left: false, right: false, fire: false };
+    fireHeld = false;
+    thrusting = false;
   }
 
   function bindPad() {
@@ -1991,8 +2387,9 @@
     });
     bindPad();
     bindSubjectLinks();
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('keyup', onKeyUp, true);
+    window.addEventListener('blur', onWindowBlur);
   }
 
   function start(g, h) {
@@ -2014,7 +2411,12 @@
     keys = {};
     pad = { up: false, down: false, left: false, right: false, fire: false };
     fireHeld = false;
+    thrusting = false;
+    wingmen = [];
+    wingmenLeft = 0;
     flightDone = true;
+    const screen = $('#screen-flight');
+    if (screen) screen.classList.remove('flight-playing');
   }
 
   function notifyGateAnswer(subject) {

@@ -92,7 +92,7 @@
           <button type="button" class="btn btn-xl btn-flight" id="nav-flight">
             <span class="emoji">✈️</span>
             <span class="label">Space Fox Flyer</span>
-            <span class="hint">Top-down blaster · 7-min flights · Grade 2 fave</span>
+            <span class="hint">Top-down blaster · 4-min flights · Grade 2 fave</span>
           </button>
         </div>
         <div class="hub-card">
@@ -498,17 +498,17 @@
 
       <div id="flight-panel-fly" class="flight-panel hidden">
         <div class="flight-hud">
-          <span class="flight-timer-pill" title="Play time left">⏱️ <strong id="flight-timer">7:00</strong></span>
-          <span id="flight-wave-hud" class="flight-wave-hud" title="Current wave">Wave 1</span>
-          <span class="flight-hp-wrap" title="Ship health">
+          <span class="flight-timer-pill flight-hud-pill" title="Play time left">⏱️ <strong id="flight-timer">4:00</strong></span>
+          <span id="flight-wave-hud" class="flight-wave-hud flight-hud-pill" title="Current wave">Wave 1</span>
+          <span class="flight-hp-wrap flight-hud-pill" title="Ship health">
             <span id="flight-hp-label" class="flight-hp-label">❤️ 5/5</span>
             <span class="flight-hp-bar" aria-hidden="true"><span id="flight-hp-fill" class="flight-hp-fill"></span></span>
           </span>
-          <span>⭐ Score <strong id="flight-score">0</strong></span>
-          <span>💥 Hits <strong id="flight-kills">0</strong></span>
-          <span>🌟 <strong id="flight-stars-got">0</strong></span>
-          <span id="flight-weapon-hud" class="flight-weapon-hud" title="Active weapon">🔫 Normal</span>
-          <span id="flight-flavor" class="flight-flavor">Blast those soft targets!</span>
+          <span class="flight-hud-pill">⭐ Score <strong id="flight-score">0</strong></span>
+          <span class="flight-hud-pill">💥 Hits <strong id="flight-kills">0</strong></span>
+          <span class="flight-hud-pill">🌟 <strong id="flight-stars-got">0</strong></span>
+          <span id="flight-weapon-hud" class="flight-weapon-hud flight-hud-pill" title="Active weapon">🔫 Normal</span>
+          <span id="flight-flavor" class="flight-flavor flight-hud-pill">Blast those soft targets!</span>
         </div>
         <div class="flight-canvas-wrap flight-arena-wrap">
           <canvas id="flight-fly-canvas" width="640" height="400" aria-label="Top-down flight arena"></canvas>
