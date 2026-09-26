@@ -1,8 +1,8 @@
 /* Space Fox Flyer — top-down arena shooter
-   Hangar shop · map upgrade stations · points · 4-min timed flights.
+   Hangar shop · map upgrade stations · points · 2-min timed flights.
    Waves · player HP · FPV/Shahed drones. Original kid-friendly game. */
 (function (global) {
-  const SESSION_SECONDS = 4 * 60;
+  const SESSION_SECONDS = 2 * 60;
   const QUESTIONS_TO_UNLOCK = 10;
   const GATE_SUBJECTS = ['Math', 'Reading', 'Spelling', 'Science'];
   /** Pull camera OUT so plane, bullets, and enemies are clearly visible. */
@@ -11,13 +11,13 @@
   const PLAYER_MAX_HP = 5;
   const HIT_INVULN = 90; // frames (~1.5s) after a hit
   const WINGMEN_DURATION = 20; // friend-jets perk lifetime (seconds)
-  /** Escalating waves across the 4-minute session (at = elapsed seconds). */
+  /** Escalating waves across the 2-minute session (at = elapsed seconds). */
   const WAVE_DEFS = [
     { id: 1, at: 0,   title: 'Wave 1', subtitle: 'Easy patrol',   speedMul: 0.42, densMul: 0.65, hp: 1,   shoot: 0,    boss: false, color: '#55efc4' },
-    { id: 2, at: 60,  title: 'Wave 2', subtitle: 'Medium swarm',  speedMul: 0.55, densMul: 0.95, hp: 1,   shoot: 0.14, boss: false, color: '#74b9ff' },
-    { id: 3, at: 120, title: 'Wave 3', subtitle: 'Hard chase',    speedMul: 0.68, densMul: 1.2,  hp: 1.5, shoot: 0.3,  boss: false, color: '#ffeaa7' },
-    { id: 4, at: 180, title: 'Wave 4', subtitle: 'Heavy drones',  speedMul: 0.82, densMul: 1.4,  hp: 2,   shoot: 0.42, boss: false, color: '#ff7675' },
-    { id: 5, at: 215, title: 'Wave 5', subtitle: 'Boss rush!',    speedMul: 0.95, densMul: 1.2,  hp: 3,   shoot: 0.55, boss: true,  color: '#a29bfe' }
+    { id: 2, at: 30,  title: 'Wave 2', subtitle: 'Medium swarm',  speedMul: 0.55, densMul: 0.95, hp: 1,   shoot: 0.14, boss: false, color: '#74b9ff' },
+    { id: 3, at: 60,  title: 'Wave 3', subtitle: 'Hard chase',    speedMul: 0.68, densMul: 1.2,  hp: 1.5, shoot: 0.3,  boss: false, color: '#ffeaa7' },
+    { id: 4, at: 90,  title: 'Wave 4', subtitle: 'Heavy drones',  speedMul: 0.82, densMul: 1.4,  hp: 2,   shoot: 0.42, boss: false, color: '#ff7675' },
+    { id: 5, at: 105, title: 'Wave 5', subtitle: 'Boss rush!',    speedMul: 0.95, densMul: 1.2,  hp: 3,   shoot: 0.55, boss: true,  color: '#a29bfe' }
   ];
 
   const WORLDS = [
@@ -410,12 +410,12 @@
     const msg = $('#flight-lock-msg');
     if (msg) {
       msg.textContent = locked
-        ? `Answer ${QUESTIONS_TO_UNLOCK} questions in Science (or Math / Reading / Spelling) to unlock more flight. Progress: ${done} / ${QUESTIONS_TO_UNLOCK}.`
+        ? `Get ${QUESTIONS_TO_UNLOCK} questions correct in Science (or Math / Reading / Spelling) to unlock more flight. Wrong answers must be fixed — only correct counts! Correct: ${done}/${QUESTIONS_TO_UNLOCK}.`
         : '';
     }
     const progEl = $('#flight-lock-progress');
     if (progEl) {
-      progEl.textContent = `${done} / ${QUESTIONS_TO_UNLOCK}`;
+      progEl.textContent = `Correct: ${done}/${QUESTIONS_TO_UNLOCK}`;
       progEl.style.setProperty('--pct', String((done / QUESTIONS_TO_UNLOCK) * 100));
     }
     const worlds = $('#flight-worlds');
@@ -434,7 +434,7 @@
     grid.innerHTML = WORLDS.map(w => {
       const open = unlocked.has(w.id) && !locked;
       const hint = locked
-        ? 'Finish 10 questions to fly again!'
+        ? 'Get 10 correct to fly again!'
         : (unlocked.has(w.id) ? w.tip : 'Finish a flight to unlock!');
       return `<button type="button" class="btn btn-xl flight-world-btn ${open ? '' : 'locked'}" data-world="${w.id}" ${open ? '' : 'disabled'} aria-label="${w.name}">
         <span class="emoji">${w.emoji}</span>
@@ -451,10 +451,10 @@
       });
     });
     const tip = locked
-      ? `Fly time's up! Answer ${QUESTIONS_TO_UNLOCK} questions (Science / Math / Reading / Spelling) to unlock more flight.`
+      ? `Fly time's up! Get ${QUESTIONS_TO_UNLOCK} questions correct (Science / Math / Reading / Spelling) to unlock more flight. Only correct answers count!`
       : (isPrek()
         ? 'Pick a world, visit the hangar shop, then blast soft targets!'
-        : 'Top-down flyer · hangar shop · map upgrade pads · 4 minutes!');
+        : 'Top-down flyer · hangar shop · map upgrade pads · 2 minutes!');
     setPrompt(tip);
     const badge = $('#flight-grade-tip');
     if (badge) {
@@ -1148,7 +1148,7 @@
     const t = $('#flight-timer');
     if (t) {
       t.textContent = formatTime(sessionLeft);
-      t.parentElement && t.parentElement.classList.toggle('flight-timer-low', sessionLeft <= 60);
+      t.parentElement && t.parentElement.classList.toggle('flight-timer-low', sessionLeft <= 30);
     }
     const we = $('#flight-weapon-hud');
     if (we) {
@@ -1836,21 +1836,31 @@
           ctx.fillStyle = '#55efc4';
           ctx.fillRect(-bw / 2, -e.r - 14, bw * pct, 6);
         }
+      } else if (e.type === 'star') {
+        // Clear 5-point gold star (not a plain bubble)
+        const outer = e.r * 0.95;
+        const inner = outer * 0.42;
+        ctx.shadowColor = '#ffd93d';
+        ctx.shadowBlur = 16;
+        drawStarShape(ctx, outer, inner);
+        ctx.fillStyle = '#ffd93d';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#fff6a5';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        drawStarShape(ctx, outer * 0.55, inner * 0.55);
+        ctx.fillStyle = '#ffeaa7';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 1.5;
+        drawStarShape(ctx, outer, inner);
+        ctx.stroke();
       } else {
         ctx.font = `${Math.round(e.r * 1.7)}px serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(e.emoji, 0, 0);
-        if (e.type === 'star') {
-          ctx.beginPath();
-          ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-          ctx.lineWidth = 3;
-          ctx.shadowColor = '#ffd93d';
-          ctx.shadowBlur = 10;
-          ctx.arc(0, 0, e.r, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-        }
       }
       ctx.restore();
     }
@@ -2072,6 +2082,23 @@
     ctx.restore();
   }
 
+
+  /** Classic 5-point star silhouette (collectible pickup). */
+  function drawStarShape(ctx, outerR, innerR) {
+    const spikes = 5;
+    let rot = Math.PI / 2 * 3;
+    const step = Math.PI / spikes;
+    ctx.beginPath();
+    ctx.moveTo(0, -outerR);
+    for (let i = 0; i < spikes; i++) {
+      ctx.lineTo(Math.cos(rot) * outerR, Math.sin(rot) * outerR);
+      rot += step;
+      ctx.lineTo(Math.cos(rot) * innerR, Math.sin(rot) * innerR);
+      rot += step;
+    }
+    ctx.closePath();
+  }
+
   function drawFriendJet(ctx, w) {
     ctx.save();
     ctx.translate(w.x, w.y);
@@ -2281,7 +2308,7 @@
 
     setPrompt(
       timeup
-        ? `Fly time's up! Answer ${QUESTIONS_TO_UNLOCK} questions in Science (or Math / Reading / Spelling) to unlock more flight.`
+        ? `Fly time's up! Get ${QUESTIONS_TO_UNLOCK} questions correct in Science (or Math / Reading / Spelling) to unlock more flight.`
         : (ko
           ? `Hull empty at ${waveDef(currentWaveIdx).title}. Score saved — launch again when ready!`
           : `Great run! +${pointsGained} points — spend them in the hangar!`)

@@ -440,6 +440,12 @@
     return getState();
   }
 
+  /** Re-open the same problem after a wrong answer (flight unlock gate). */
+  function retrySame() {
+    locked = false;
+    return getState();
+  }
+
   function check(answer) {
     if (locked || !problem) return null;
     if (answer === '' || answer === null || answer === undefined) return null;
@@ -474,7 +480,7 @@
     return round >= COURSES[courseId].rounds;
   }
 
-  global.MathCourse = { COURSES, start, next, check, getState, isDone, visualFor };
+  global.MathCourse = { COURSES, start, next, retrySame, check, getState, isDone, visualFor };
   // Alias expected by educator notes
   global.MathGame = global.MathCourse;
 })(window);

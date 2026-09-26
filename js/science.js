@@ -97,7 +97,13 @@
     return getState();
   }
 
-  function getState() {
+  /** Re-open the same question after a wrong answer (flight unlock gate). */
+  function retrySame() {
+    locked = false;
+    return getState();
+  }
+
+    function getState() {
     return {
       grade,
       round,
@@ -116,5 +122,5 @@
     };
   }
 
-  global.ScienceGame = { start, check, next, getState };
+  global.ScienceGame = { start, check, next, retrySame, getState };
 })(window);

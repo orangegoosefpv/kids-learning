@@ -48,7 +48,19 @@
     return base;
   }
 
-  function applyFlightGateAnswer(section) {
+  function isFlightGateLocked() {
+    const fp = ensureFlightProgress(profile().flight);
+    return !!fp.flightLocked;
+  }
+
+  function flightGateProgressLabel() {
+    const fp = ensureFlightProgress(profile().flight);
+    const done = Math.max(0, Math.min(10, Number(fp.questionsTowardUnlock) || 0));
+    return 'Correct: ' + done + '/10';
+  }
+
+  /** Only CORRECT answers in gate subjects advance unlock progress. */
+  function applyFlightGateAnswer(section, correct) {
     const name = String(section || '');
     const matched = FLIGHT_GATE_SUBJECTS.some(s => s.toLowerCase() === name.toLowerCase());
     if (!matched) return null;
@@ -57,6 +69,11 @@
     if (!fp.flightLocked) {
       p.flight = fp;
       return null;
+    }
+    // Wrong answers never increment — kid must answer correctly
+    if (!correct) {
+      p.flight = fp;
+      return { questionsTowardUnlock: fp.questionsTowardUnlock || 0, unlocked: false, locked: true, counted: false };
     }
     fp.questionsTowardUnlock = Math.min(
       10,
@@ -73,7 +90,7 @@
     updateChrome();
     refreshHubStats();
     if (window.FlightGame && FlightGame.refreshLockUi) FlightGame.refreshLockUi();
-    return { questionsTowardUnlock: fp.questionsTowardUnlock, unlocked: unlocked, locked: fp.flightLocked };
+    return { questionsTowardUnlock: fp.questionsTowardUnlock, unlocked: unlocked, locked: fp.flightLocked, counted: true };
   }
 
   function trackAnswer(section, prompt, correct, detail) {
@@ -85,8 +102,8 @@
       correct: !!correct,
       detail: detail || ''
     });
-    // Count answer submissions toward Space Fox Flyer unlock gate (while locked)
-    applyFlightGateAnswer(section);
+    // Only correct answers count toward Space Fox Flyer unlock gate (while locked)
+    applyFlightGateAnswer(section, !!correct);
     if (KidsStorage.isHousehold(state)) persist();
     updateTrackerCount();
     // Quiet rewrite of linked Excel when File System Access is available
@@ -218,7 +235,7 @@
       <div class="stat-pill">🔢 Math best: <span>${p.math[kidGrade()] || 0}</span></div>
       <div class="stat-pill">🐵 Monkey Code: <span>${stemDone}/12</span></div>
       <div class="stat-pill">♟️ Chess: <span>${(p.chess && p.chess.completed) || 0}</span></div>
-      <div class="stat-pill">✈️ Flyer: <span>${(p.flight && p.flight.completed) || 0}</span> · best ${ (p.flight && p.flight.bestScore) || 0 } · 🪙 ${(p.flight && p.flight.points) || 0}${(p.flight && p.flight.flightLocked) ? ' · 🔒 ' + ((p.flight.questionsTowardUnlock || 0)) + '/10' : ''}</div>
+      <div class="stat-pill">✈️ Flyer: <span>${(p.flight && p.flight.completed) || 0}</span> · best ${ (p.flight && p.flight.bestScore) || 0 } · 🪙 ${(p.flight && p.flight.points) || 0}${(p.flight && p.flight.flightLocked) ? ' · 🔒 Correct: ' + ((p.flight.questionsTowardUnlock || 0)) + '/10' : ''}</div>
     `;
     renderJourneyMap(p);
     updateTrackerCount();
@@ -727,6 +744,7 @@
 
   /* ================= MATH ================= */
   let mathAwaitEnter = false;
+  let mathGateRetry = false;
   let mathAdvanceTimer = null;
 
   function openMath() {
@@ -741,6 +759,8 @@
 
   function startMathCourse(id) {
     MathCourse.start(id);
+    mathAwaitEnter = false;
+    mathGateRetry = false;
     $('#math-course-pick').classList.add('hidden');
     $('#math-play').classList.remove('hidden');
     const c = MathCourse.COURSES[id];
@@ -859,10 +879,13 @@
     const res = MathCourse.check(answer);
     if (!res) return;
     const prob = MathCourse.getState().problem;
+    const gateLocked = isFlightGateLocked();
     trackAnswer('Math', (prob && prob.prompt) || 'Math problem', res.ok, 'answer: ' + answer);
+    mathGateRetry = false;
     if (btnEl) {
       btnEl.classList.add(res.ok ? 'correct' : 'wrong');
-      if (!res.ok) {
+      // While flyer is locked, do not reveal the answer — kid must retry same question
+      if (!res.ok && !gateLocked) {
         $$('.choice-btn', $('#math-choices')).forEach(b => {
           if (Number(b.textContent) === Number(res.correct)) b.classList.add('correct');
         });
@@ -873,6 +896,12 @@
       $('#math-feedback').className = 'feedback ok';
       const teachEl = $('#math-teach');
       if (teachEl) { teachEl.classList.add('hidden'); teachEl.innerHTML = ''; }
+    } else if (gateLocked) {
+      mathGateRetry = true;
+      const teachEl = $('#math-teach');
+      if (teachEl) { teachEl.classList.add('hidden'); teachEl.innerHTML = ''; }
+      $('#math-feedback').textContent = 'Try again — only correct answers count! (' + flightGateProgressLabel() + ')';
+      $('#math-feedback').className = 'feedback bad';
     } else {
       $('#math-feedback').textContent = 'Let\'s see how it works';
       $('#math-feedback').className = 'feedback bad';
@@ -884,7 +913,11 @@
     if (mathAdvanceTimer) { clearTimeout(mathAdvanceTimer); mathAdvanceTimer = null; }
     // Manual Next only — give time to review teach visuals / correct answer
     if (res.ok) {
-      $('#math-feedback').textContent = '⭐ Yes! Tap Next when ready.';
+      $('#math-feedback').textContent = gateLocked
+        ? ('⭐ Yes! ' + flightGateProgressLabel() + ' — tap Next when ready.')
+        : '⭐ Yes! Tap Next when ready.';
+    } else if (gateLocked) {
+      $('#math-feedback').textContent = 'Try again — only correct answers count! (' + flightGateProgressLabel() + ') Tap Next to retry.';
     } else {
       $('#math-feedback').textContent = "Let's see how it works — tap Next when you're ready.";
     }
@@ -902,6 +935,12 @@
     cancelReadAloud();
     if (mathAdvanceTimer) { clearTimeout(mathAdvanceTimer); mathAdvanceTimer = null; }
     $('#math-next-row')?.classList.add('hidden');
+    if (mathGateRetry) {
+      mathGateRetry = false;
+      MathCourse.retrySame();
+      renderMathProblem();
+      return;
+    }
     MathCourse.next();
     const st = MathCourse.getState();
     if (st.round >= st.total) finishMathCourse();
@@ -930,6 +969,7 @@
 
   /* ================= READING ================= */
   let readingAwaitEnter = false;
+  let readingGateRetry = false;
   let readingSentences = [];
   let readingSentenceIdx = 0;
 
@@ -937,6 +977,7 @@
     cancelReadAloud();
     showScreen('screen-reading');
     readingAwaitEnter = false;
+    readingGateRetry = false;
     readingSentences = [];
     readingSentenceIdx = 0;
     ReadingGame.start(kidGrade());
@@ -1096,17 +1137,30 @@
     const res = ReadingGame.check(answer);
     if (!res) return;
     const q = ReadingGame.getState().question;
+    const gateLocked = isFlightGateLocked();
     trackAnswer('Reading', (q && (q.prompt || q.show)) || 'Reading', res.ok, 'answer: ' + answer);
+    readingGateRetry = false;
     if (btnEl) {
       btnEl.classList.add(res.ok ? 'correct' : 'wrong');
-      if (!res.ok) {
+      if (!res.ok && !gateLocked) {
         $$('.choice-btn', $('#reading-choices')).forEach(b => {
           if (b.textContent === String(res.correct)) b.classList.add('correct');
         });
       }
     }
-    $('#reading-feedback').textContent = res.ok ? '⭐ Yes!' : `Answer: ${res.correct}`;
-    $('#reading-feedback').className = 'feedback ' + (res.ok ? 'ok' : 'bad');
+    if (res.ok) {
+      $('#reading-feedback').textContent = gateLocked
+        ? ('⭐ Yes! ' + flightGateProgressLabel())
+        : '⭐ Yes!';
+      $('#reading-feedback').className = 'feedback ok';
+    } else if (gateLocked) {
+      readingGateRetry = true;
+      $('#reading-feedback').textContent = 'Try again — only correct answers count! (' + flightGateProgressLabel() + ')';
+      $('#reading-feedback').className = 'feedback bad';
+    } else {
+      $('#reading-feedback').textContent = `Answer: ${res.correct}`;
+      $('#reading-feedback').className = 'feedback bad';
+    }
     readingAwaitEnter = true;
     $('#reading-next-row')?.classList.remove('hidden');
   }
@@ -1115,6 +1169,12 @@
     if (!readingAwaitEnter) return;
     readingAwaitEnter = false;
     cancelReadAloud();
+    if (readingGateRetry) {
+      readingGateRetry = false;
+      ReadingGame.retrySame();
+      renderReading();
+      return;
+    }
     ReadingGame.next();
     const st = ReadingGame.getState();
     if (st.done) finishReading();
@@ -1310,11 +1370,13 @@
 
   /* ================= SCIENCE ================= */
   let scienceAwaitEnter = false;
+  let scienceGateRetry = false;
 
   function openScience() {
     cancelReadAloud();
     showScreen('screen-science');
     scienceAwaitEnter = false;
+    scienceGateRetry = false;
     ScienceGame.start(kidGrade());
     $('#science-title').textContent = `🔬 Science · ${KidsStorage.gradeLabel(kidGrade())}`;
     const scSpeak = $('#science-speak');
@@ -1366,17 +1428,30 @@
     const res = ScienceGame.check(answer);
     if (!res) return;
     const item = ScienceGame.getState().item;
+    const gateLocked = isFlightGateLocked();
     trackAnswer('Science', (item && item.q) || 'Science', res.ok, 'answer: ' + answer);
+    scienceGateRetry = false;
     if (btnEl) {
       btnEl.classList.add(res.ok ? 'correct' : 'wrong');
-      if (!res.ok) {
+      if (!res.ok && !gateLocked) {
         $$('.choice-btn', $('#science-choices')).forEach(b => {
           if (b.textContent === String(res.correct)) b.classList.add('correct');
         });
       }
     }
-    $('#science-feedback').textContent = res.ok ? '⭐ Cool!' : `Answer: ${res.correct}`;
-    $('#science-feedback').className = 'feedback ' + (res.ok ? 'ok' : 'bad');
+    if (res.ok) {
+      $('#science-feedback').textContent = gateLocked
+        ? ('⭐ Cool! ' + flightGateProgressLabel())
+        : '⭐ Cool!';
+      $('#science-feedback').className = 'feedback ok';
+    } else if (gateLocked) {
+      scienceGateRetry = true;
+      $('#science-feedback').textContent = 'Try again — only correct answers count! (' + flightGateProgressLabel() + ')';
+      $('#science-feedback').className = 'feedback bad';
+    } else {
+      $('#science-feedback').textContent = `Answer: ${res.correct}`;
+      $('#science-feedback').className = 'feedback bad';
+    }
     scienceAwaitEnter = true;
     $('#science-next-row')?.classList.remove('hidden');
   }
@@ -1385,6 +1460,12 @@
     if (!scienceAwaitEnter) return;
     scienceAwaitEnter = false;
     cancelReadAloud();
+    if (scienceGateRetry) {
+      scienceGateRetry = false;
+      ScienceGame.retrySame();
+      renderScience();
+      return;
+    }
     ScienceGame.next();
     const st = ScienceGame.getState();
     if (st.done) finishScience();
