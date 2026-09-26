@@ -31,8 +31,20 @@
     if (typeof base.flightLocked !== 'boolean') base.flightLocked = !!base.flightLocked;
     if (!base.lastShipId) base.lastShipId = 'foxjet';
     if (!base.lastUpgrades || typeof base.lastUpgrades !== 'object') {
-      base.lastUpgrades = { speed: false, fire: false, shield: false };
+      base.lastUpgrades = { speed: false, fire: false, shield: false, magnet: false, burst: false };
     }
+    if (typeof base.points !== 'number' || base.points < 0) base.points = Math.max(0, Number(base.points) || 0);
+    if (!Array.isArray(base.ownedShips)) base.ownedShips = ['scout', 'zippy', 'foxjet'];
+    ['scout', 'zippy', 'foxjet'].forEach(id => {
+      if (!base.ownedShips.includes(id)) base.ownedShips.push(id);
+    });
+    if (!base.weaponLevels || typeof base.weaponLevels !== 'object') {
+      base.weaponLevels = { damage: 0, firerate: 0, multishot: 0 };
+    }
+    ['damage', 'firerate', 'multishot'].forEach(k => {
+      if (typeof base.weaponLevels[k] !== 'number') base.weaponLevels[k] = 0;
+    });
+    if (!Array.isArray(base.ownedPerks)) base.ownedPerks = [];
     return base;
   }
 
@@ -206,7 +218,7 @@
       <div class="stat-pill">🔢 Math best: <span>${p.math[kidGrade()] || 0}</span></div>
       <div class="stat-pill">🐵 Monkey Code: <span>${stemDone}/12</span></div>
       <div class="stat-pill">♟️ Chess: <span>${(p.chess && p.chess.completed) || 0}</span></div>
-      <div class="stat-pill">✈️ Flyer: <span>${(p.flight && p.flight.completed) || 0}</span> · best ${ (p.flight && p.flight.bestScore) || 0 }${(p.flight && p.flight.flightLocked) ? ' · 🔒 ' + ((p.flight.questionsTowardUnlock || 0)) + '/10' : ''}</div>
+      <div class="stat-pill">✈️ Flyer: <span>${(p.flight && p.flight.completed) || 0}</span> · best ${ (p.flight && p.flight.bestScore) || 0 } · 🪙 ${(p.flight && p.flight.points) || 0}${(p.flight && p.flight.flightLocked) ? ' · 🔒 ' + ((p.flight.questionsTowardUnlock || 0)) + '/10' : ''}</div>
     `;
     renderJourneyMap(p);
     updateTrackerCount();
@@ -2036,6 +2048,20 @@
 
     FlightGame.start(kidGrade(), {
       getProgress: () => ensureFlightProgress(profile().flight),
+      saveProgress: (next) => {
+        const fp = ensureFlightProgress(profile().flight);
+        Object.assign(fp, next || {});
+        if (!Array.isArray(fp.ownedShips)) fp.ownedShips = ['scout', 'zippy', 'foxjet'];
+        if (!Array.isArray(fp.ownedPerks)) fp.ownedPerks = [];
+        if (!fp.weaponLevels || typeof fp.weaponLevels !== 'object') {
+          fp.weaponLevels = { damage: 0, firerate: 0, multishot: 0 };
+        }
+        if (typeof fp.points !== 'number' || fp.points < 0) fp.points = Math.max(0, Number(fp.points) || 0);
+        profile().flight = ensureFlightProgress(fp);
+        persist();
+        updateChrome();
+        refreshHubStats();
+      },
       onPrompt: (text) => {
         setReadAloud(text || '', { auto: isPrek() });
       },
@@ -2053,6 +2079,9 @@
         if (result.completedDelta) fp.completed = (fp.completed || 0) + result.completedDelta;
         if (typeof result.score === 'number' && result.score > (fp.bestScore || 0)) {
           fp.bestScore = result.score;
+        }
+        if (typeof result.pointsGained === 'number' && result.pointsGained > 0) {
+          fp.points = (fp.points || 0) + result.pointsGained;
         }
         if (result.unlockWorld != null && !fp.unlockedWorlds.includes(result.unlockWorld)) {
           fp.unlockedWorlds.push(result.unlockWorld);
@@ -2076,7 +2105,7 @@
           subject: 'flight',
           prompt: `${(FlightGame.WORLDS[result.worldId] || {}).name || 'World'} flight`,
           correct: !!result.cleared,
-          detail: `score=${result.score};kills=${result.kills || result.rings};stars=${result.stars};timeup=${!!result.timeup}`
+          detail: `score=${result.score};kills=${result.kills || result.rings};stars=${result.stars};points=+${result.pointsGained || 0};bal=${fp.points || 0};timeup=${!!result.timeup}`
         });
         if (KidsStorage.isHousehold(state)) persist();
         updateTrackerCount();

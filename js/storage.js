@@ -28,7 +28,7 @@
       science: { completed: 0 },
       chess: { completed: 0, learned: [] },
       stem: { level: 0, completed: [] },
-      flight: { completed: 0, bestScore: 0, unlockedWorlds: [0], questionsTowardUnlock: 0, flightLocked: false, lastShipId: 'foxjet', lastUpgrades: { speed: false, fire: false, shield: false } }
+      flight: { completed: 0, bestScore: 0, unlockedWorlds: [0], questionsTowardUnlock: 0, flightLocked: false, lastShipId: 'foxjet', lastUpgrades: { speed: false, fire: false, shield: false, magnet: false, burst: false }, points: 0, ownedShips: ['scout', 'zippy', 'foxjet'], weaponLevels: { damage: 0, firerate: 0, multishot: 0 }, ownedPerks: [] }
     };
   }
 
@@ -116,7 +116,7 @@
     if (!Array.isArray(out.chess.learned)) out.chess.learned = [];
     if (!out.stem) out.stem = { level: 0, completed: [] };
     if (!Array.isArray(out.stem.completed)) out.stem.completed = [];
-    if (!out.flight) out.flight = { completed: 0, bestScore: 0, unlockedWorlds: [0], questionsTowardUnlock: 0, flightLocked: false, lastShipId: 'foxjet', lastUpgrades: { speed: false, fire: false, shield: false } };
+    if (!out.flight) out.flight = { completed: 0, bestScore: 0, unlockedWorlds: [0], questionsTowardUnlock: 0, flightLocked: false, lastShipId: 'foxjet', lastUpgrades: { speed: false, fire: false, shield: false, magnet: false, burst: false }, points: 0, ownedShips: ['scout', 'zippy', 'foxjet'], weaponLevels: { damage: 0, firerate: 0, multishot: 0 }, ownedPerks: [] };
     if (!Array.isArray(out.flight.unlockedWorlds)) out.flight.unlockedWorlds = [0];
     if (typeof out.flight.bestScore !== 'number') out.flight.bestScore = 0;
     if (typeof out.flight.completed !== 'number') out.flight.completed = 0;
@@ -124,8 +124,16 @@
     if (typeof out.flight.flightLocked !== 'boolean') out.flight.flightLocked = !!out.flight.flightLocked;
     if (!out.flight.lastShipId) out.flight.lastShipId = 'foxjet';
     if (!out.flight.lastUpgrades || typeof out.flight.lastUpgrades !== 'object') {
-      out.flight.lastUpgrades = { speed: false, fire: false, shield: false };
+      out.flight.lastUpgrades = { speed: false, fire: false, shield: false, magnet: false, burst: false };
     }
+    if (typeof out.flight.points !== 'number' || out.flight.points < 0) out.flight.points = Math.max(0, Number(out.flight.points) || 0);
+    if (!Array.isArray(out.flight.ownedShips)) out.flight.ownedShips = ['scout', 'zippy', 'foxjet'];
+    ['scout', 'zippy', 'foxjet'].forEach(function (id) { if (out.flight.ownedShips.indexOf(id) < 0) out.flight.ownedShips.push(id); });
+    if (!out.flight.weaponLevels || typeof out.flight.weaponLevels !== 'object') out.flight.weaponLevels = { damage: 0, firerate: 0, multishot: 0 };
+    ['damage', 'firerate', 'multishot'].forEach(function (k) {
+      if (typeof out.flight.weaponLevels[k] !== 'number') out.flight.weaponLevels[k] = 0;
+    });
+    if (!Array.isArray(out.flight.ownedPerks)) out.flight.ownedPerks = [];
     return out;
   }
 
@@ -169,7 +177,7 @@
     if (!out.chess) out.chess = { completed: 0, learned: [] };
     if (!Array.isArray(out.chess.learned)) out.chess.learned = [];
     if (!Array.isArray(out.stem.completed)) out.stem.completed = [];
-    if (!out.flight) out.flight = { completed: 0, bestScore: 0, unlockedWorlds: [0], questionsTowardUnlock: 0, flightLocked: false, lastShipId: 'foxjet', lastUpgrades: { speed: false, fire: false, shield: false } };
+    if (!out.flight) out.flight = { completed: 0, bestScore: 0, unlockedWorlds: [0], questionsTowardUnlock: 0, flightLocked: false, lastShipId: 'foxjet', lastUpgrades: { speed: false, fire: false, shield: false, magnet: false, burst: false }, points: 0, ownedShips: ['scout', 'zippy', 'foxjet'], weaponLevels: { damage: 0, firerate: 0, multishot: 0 }, ownedPerks: [] };
     if (!Array.isArray(out.flight.unlockedWorlds)) out.flight.unlockedWorlds = [0];
     if (typeof out.flight.bestScore !== 'number') out.flight.bestScore = 0;
     if (typeof out.flight.completed !== 'number') out.flight.completed = 0;
@@ -177,8 +185,16 @@
     if (typeof out.flight.flightLocked !== 'boolean') out.flight.flightLocked = !!out.flight.flightLocked;
     if (!out.flight.lastShipId) out.flight.lastShipId = 'foxjet';
     if (!out.flight.lastUpgrades || typeof out.flight.lastUpgrades !== 'object') {
-      out.flight.lastUpgrades = { speed: false, fire: false, shield: false };
+      out.flight.lastUpgrades = { speed: false, fire: false, shield: false, magnet: false, burst: false };
     }
+    if (typeof out.flight.points !== 'number' || out.flight.points < 0) out.flight.points = Math.max(0, Number(out.flight.points) || 0);
+    if (!Array.isArray(out.flight.ownedShips)) out.flight.ownedShips = ['scout', 'zippy', 'foxjet'];
+    ['scout', 'zippy', 'foxjet'].forEach(function (id) { if (out.flight.ownedShips.indexOf(id) < 0) out.flight.ownedShips.push(id); });
+    if (!out.flight.weaponLevels || typeof out.flight.weaponLevels !== 'object') out.flight.weaponLevels = { damage: 0, firerate: 0, multishot: 0 };
+    ['damage', 'firerate', 'multishot'].forEach(function (k) {
+      if (typeof out.flight.weaponLevels[k] !== 'number') out.flight.weaponLevels[k] = 0;
+    });
+    if (!Array.isArray(out.flight.ownedPerks)) out.flight.ownedPerks = [];
     return out;
   }
 

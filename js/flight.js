@@ -1,10 +1,13 @@
 /* Space Fox Flyer — top-down arena shooter
-   Pick a ship + boosts, 7-min timed flights, soft targets (no gore).
+   Hangar shop · map upgrade stations · points · 7-min timed flights.
    Original kid-friendly game (emoji/canvas art). No third-party IP assets. */
 (function (global) {
   const SESSION_SECONDS = 7 * 60;
   const QUESTIONS_TO_UNLOCK = 10;
   const GATE_SUBJECTS = ['Math', 'Reading', 'Spelling', 'Science'];
+  /** Pull camera OUT so plane, bullets, and enemies are clearly visible. */
+  const CAM_ZOOM = 0.48;
+  const MAX_EQUIP_PERKS = 2;
 
   const WORLDS = [
     {
@@ -17,7 +20,7 @@
       skyBot: '#c8f0a8',
       ground: '#5cb85c',
       accent: '#ffd93d',
-      arena: 1600,
+      arena: 2000,
       enemies: 8,
       asteroids: 5,
       stars: 6,
@@ -36,7 +39,7 @@
       skyBot: '#3d2b6b',
       ground: '#2a1a4a',
       accent: '#ff9f43',
-      arena: 1800,
+      arena: 2200,
       enemies: 10,
       asteroids: 8,
       stars: 8,
@@ -55,7 +58,7 @@
       skyBot: '#ffeaa7',
       ground: '#74b9ff',
       accent: '#fd79a8',
-      arena: 1700,
+      arena: 2100,
       enemies: 9,
       asteroids: 6,
       stars: 7,
@@ -72,10 +75,12 @@
       name: 'Scout Flutter',
       emoji: '🛩️',
       color: '#74b9ff',
-      tip: 'Easy turns · great starter',
+      tip: 'Easy turns · free starter',
       turn: 1.12,
       thrust: 0.95,
-      fire: 1
+      fire: 1,
+      cost: 0,
+      tier: 1
     },
     {
       id: 'zippy',
@@ -85,7 +90,9 @@
       tip: 'Speedy · zip around!',
       turn: 1,
       thrust: 1.2,
-      fire: 1.05
+      fire: 1.05,
+      cost: 0,
+      tier: 1
     },
     {
       id: 'foxjet',
@@ -95,22 +102,78 @@
       tip: 'Fox power · balanced blast',
       turn: 1.05,
       thrust: 1.05,
-      fire: 1.15
+      fire: 1.15,
+      cost: 0,
+      tier: 1
+    },
+    {
+      id: 'nova',
+      name: 'Nova Racer',
+      emoji: '🚀',
+      color: '#00cec9',
+      tip: 'Sleek · snappy shots',
+      turn: 1.15,
+      thrust: 1.25,
+      fire: 1.25,
+      cost: 120,
+      tier: 2
+    },
+    {
+      id: 'phoenix',
+      name: 'Star Phoenix',
+      emoji: '🔥',
+      color: '#e17055',
+      tip: 'Hot wings · punchy bolts',
+      turn: 1.08,
+      thrust: 1.18,
+      fire: 1.35,
+      cost: 220,
+      tier: 3
+    },
+    {
+      id: 'cosmic',
+      name: 'Cosmic Fox',
+      emoji: '✨',
+      color: '#a29bfe',
+      tip: 'Legendary · all-around ace',
+      turn: 1.2,
+      thrust: 1.3,
+      fire: 1.4,
+      cost: 350,
+      tier: 4
     }
   ];
 
-  const UPGRADES = [
-    { id: 'speed', label: 'Speed', emoji: '⚡', tip: 'Zoom faster' },
-    { id: 'fire', label: 'Fire rate', emoji: '🔥', tip: 'Shoot quicker' },
-    { id: 'shield', label: 'Shield', emoji: '🛡️', tip: 'Extra soft bump buffer' }
+  const WEAPON_SHOP = [
+    { id: 'damage', label: 'Power Bolts', emoji: '💥', tip: 'Bigger boom damage', cost: 80, maxLevel: 3 },
+    { id: 'firerate', label: 'Quick Trigger', emoji: '⚡', tip: 'Shoot faster', cost: 100, maxLevel: 3 },
+    { id: 'multishot', label: 'Twin Cannons', emoji: '🎯', tip: 'Extra bullets', cost: 150, maxLevel: 2 }
   ];
+
+  const PERK_SHOP = [
+    { id: 'speed', label: 'Speed Boost', emoji: '💨', tip: 'Zoom faster', cost: 60 },
+    { id: 'shield', label: 'Shield Pack', emoji: '🛡️', tip: 'Extra soft bump buffer', cost: 70 },
+    { id: 'magnet', label: 'Star Magnet', emoji: '🧲', tip: 'Pull nearby stars', cost: 90 },
+    { id: 'burst', label: 'Long Burst', emoji: '🌟', tip: 'Bullets fly farther', cost: 110 }
+  ];
+
+  /** Map landmarks — fly into / overlap to equip for this run. */
+  const STATIONS = [
+    { id: 'rapid', name: 'Rapid Fire', short: 'Rapid', emoji: '🔥', color: '#ff7675', weapon: 'rapid', tip: 'Super-fast shots!' },
+    { id: 'spread', name: 'Spread Shot', short: 'Spread', emoji: '💫', color: '#a29bfe', weapon: 'spread', tip: 'Fan of bolts!' },
+    { id: 'shieldpad', name: 'Shield Buoy', short: 'Shield', emoji: '🛡️', color: '#74b9ff', weapon: 'shieldpad', tip: 'Shield refill!' },
+    { id: 'missile', name: 'Missile Pad', short: 'Missile', emoji: '🚀', color: '#fd79a8', weapon: 'missile', tip: 'Big seeking boom!' }
+  ];
+
+  // Legacy alias used by older UI copy
+  const UPGRADES = PERK_SHOP.map(p => ({ id: p.id, label: p.label, emoji: p.emoji, tip: p.tip }));
 
   let grade = 'grade2';
   let hooks = {};
   let mode = 'menu'; // menu | build | countdown | fly | results
   let worldIdx = 0;
   let shipId = 'foxjet';
-  let upgrades = { speed: false, fire: false, shield: false };
+  let equippedPerks = { speed: false, fire: false, shield: false, magnet: false, burst: false };
   let raf = 0;
   let keys = {};
   let pad = { up: false, down: false, left: false, right: false, fire: false };
@@ -119,6 +182,7 @@
   let entities = [];
   let particles = [];
   let score = 0;
+  let pointsEarnedRun = 0;
   let collected = { stars: 0, kills: 0 };
   let flightDone = false;
   let flavor = '';
@@ -130,6 +194,8 @@
   let lastTs = 0;
   let cam = { x: 0, y: 0 };
   let fireHeld = false;
+  let activeWeapon = 'normal';
+  let stationCooldown = {};
 
   function $(sel, root) {
     return (root || document).querySelector(sel);
@@ -159,14 +225,6 @@
     return { thrust: 0.25, turn: 0.09, maxSpeed: 5, fireMs: 260, bulletSpeed: 10, enemySpeed: 1.2, hitPad: 6 };
   }
 
-  function upgradeCount() {
-    return (upgrades.speed ? 1 : 0) + (upgrades.fire ? 1 : 0) + (upgrades.shield ? 1 : 0);
-  }
-
-  function progress() {
-    return (hooks.getProgress && hooks.getProgress()) || defaultProgress();
-  }
-
   function defaultProgress() {
     return {
       completed: 0,
@@ -175,8 +233,62 @@
       questionsTowardUnlock: 0,
       flightLocked: false,
       lastShipId: 'foxjet',
-      lastUpgrades: { speed: false, fire: false, shield: false }
+      lastUpgrades: { speed: false, fire: false, shield: false, magnet: false, burst: false },
+      points: 0,
+      ownedShips: ['scout', 'zippy', 'foxjet'],
+      weaponLevels: { damage: 0, firerate: 0, multishot: 0 },
+      ownedPerks: []
     };
+  }
+
+  function progress() {
+    const p = (hooks.getProgress && hooks.getProgress()) || defaultProgress();
+    return normalizeFlightProgress(p);
+  }
+
+  function normalizeFlightProgress(fp) {
+    const base = fp && typeof fp === 'object' ? fp : {};
+    if (!Array.isArray(base.unlockedWorlds)) base.unlockedWorlds = [0];
+    if (!base.unlockedWorlds.includes(0)) base.unlockedWorlds.push(0);
+    if (typeof base.completed !== 'number') base.completed = 0;
+    if (typeof base.bestScore !== 'number') base.bestScore = 0;
+    if (typeof base.questionsTowardUnlock !== 'number') base.questionsTowardUnlock = 0;
+    if (typeof base.flightLocked !== 'boolean') base.flightLocked = !!base.flightLocked;
+    if (!base.lastShipId) base.lastShipId = 'foxjet';
+    if (!base.lastUpgrades || typeof base.lastUpgrades !== 'object') {
+      base.lastUpgrades = { speed: false, fire: false, shield: false, magnet: false, burst: false };
+    }
+    if (typeof base.points !== 'number' || base.points < 0) base.points = Math.max(0, Number(base.points) || 0);
+    if (!Array.isArray(base.ownedShips)) base.ownedShips = ['scout', 'zippy', 'foxjet'];
+    ['scout', 'zippy', 'foxjet'].forEach(id => {
+      if (!base.ownedShips.includes(id)) base.ownedShips.push(id);
+    });
+    if (!base.weaponLevels || typeof base.weaponLevels !== 'object') {
+      base.weaponLevels = { damage: 0, firerate: 0, multishot: 0 };
+    }
+    ['damage', 'firerate', 'multishot'].forEach(k => {
+      if (typeof base.weaponLevels[k] !== 'number') base.weaponLevels[k] = 0;
+      base.weaponLevels[k] = Math.max(0, Math.min(5, base.weaponLevels[k] | 0));
+    });
+    if (!Array.isArray(base.ownedPerks)) base.ownedPerks = [];
+    // Migrate old free-toggle boosts into owned perks if they were ever selected
+    const lu = base.lastUpgrades || {};
+    ['speed', 'shield', 'magnet', 'burst'].forEach(id => {
+      if (lu[id] && !base.ownedPerks.includes(id)) base.ownedPerks.push(id);
+    });
+    if (lu.fire && (base.weaponLevels.firerate || 0) < 1) base.weaponLevels.firerate = 1;
+    return base;
+  }
+
+  function saveProgressPatch(patch) {
+    const cur = progress();
+    const next = Object.assign({}, cur, patch || {});
+    if (hooks.saveProgress) hooks.saveProgress(next);
+    else if (hooks.onSaveProgress) hooks.onSaveProgress(next);
+  }
+
+  function perkEquippedCount() {
+    return PERK_SHOP.filter(p => equippedPerks[p.id]).length;
   }
 
   function isLocked() {
@@ -226,6 +338,11 @@
     return m + ':' + String(r).padStart(2, '0');
   }
 
+  function updatePointsUi() {
+    const pts = progress().points || 0;
+    $$('.flight-points-bal').forEach(el => { el.textContent = String(pts); });
+  }
+
   function updateLockBanner() {
     const banner = $('#flight-lock-banner');
     if (!banner) return;
@@ -245,6 +362,7 @@
     }
     const worlds = $('#flight-worlds');
     if (worlds) worlds.classList.toggle('flight-worlds-locked', locked);
+    updatePointsUi();
   }
 
   function renderMenu() {
@@ -277,14 +395,16 @@
     const tip = locked
       ? `Fly time's up! Answer ${QUESTIONS_TO_UNLOCK} questions (Science / Math / Reading / Spelling) to unlock more flight.`
       : (isPrek()
-        ? 'Pick a world, choose a ship, then blast soft targets!'
-        : 'Top-down flyer · pick a ship · blast drones & rocks · 7 minutes!');
+        ? 'Pick a world, visit the hangar shop, then blast soft targets!'
+        : 'Top-down flyer · hangar shop · map upgrade pads · 7 minutes!');
     setPrompt(tip);
     const badge = $('#flight-grade-tip');
     if (badge) {
       badge.classList.toggle('hidden', grade !== 'grade2');
-      badge.textContent = '📗 Grade 2 favorite — top-down fox flyer with blasters!';
+      badge.textContent = '📗 Grade 2 favorite — top-down fox flyer with hangar upgrades!';
     }
+    const menuPts = $('#flight-menu-points');
+    if (menuPts) menuPts.innerHTML = `🪙 Hangar points: <strong class="flight-points-bal">${progress().points || 0}</strong>`;
   }
 
   function startBuild() {
@@ -293,100 +413,258 @@
       return;
     }
     const prog = progress();
-    if (prog.lastShipId && SHIPS.some(s => s.id === prog.lastShipId)) shipId = prog.lastShipId;
+    if (prog.lastShipId && prog.ownedShips.includes(prog.lastShipId) && SHIPS.some(s => s.id === prog.lastShipId)) {
+      shipId = prog.lastShipId;
+    } else {
+      shipId = 'foxjet';
+    }
     const lu = prog.lastUpgrades || {};
-    upgrades = {
-      speed: !!lu.speed,
-      fire: !!lu.fire,
-      shield: !!lu.shield
+    equippedPerks = {
+      speed: !!(lu.speed && prog.ownedPerks.includes('speed')),
+      fire: false,
+      shield: !!(lu.shield && prog.ownedPerks.includes('shield')),
+      magnet: !!(lu.magnet && prog.ownedPerks.includes('magnet')),
+      burst: !!(lu.burst && prog.ownedPerks.includes('burst'))
     };
-    // Cap to 2 if somehow more
-    while (upgradeCount() > 2) {
-      if (upgrades.shield) upgrades.shield = false;
-      else if (upgrades.fire) upgrades.fire = false;
-      else upgrades.speed = false;
+    while (perkEquippedCount() > MAX_EQUIP_PERKS) {
+      const order = ['burst', 'magnet', 'shield', 'speed'];
+      for (const id of order) {
+        if (equippedPerks[id]) { equippedPerks[id] = false; break; }
+      }
     }
     showPanel('build');
     stopLoop();
     const w = world();
-    setPrompt(`${w.emoji} ${w.name}: pick a ship and up to 2 boosts, then Launch!`);
+    setPrompt(`${w.emoji} ${w.name}: spend points in the hangar, equip a ship, then Launch!`);
+    renderHangarShop();
+  }
+
+  function renderHangarShop() {
+    const prog = progress();
+    updatePointsUi();
+    const bal = $('#flight-shop-points');
+    if (bal) bal.innerHTML = `🪙 Points: <strong class="flight-points-bal">${prog.points || 0}</strong>`;
+
     renderShips();
-    renderUpgrades();
+    renderWeaponShop();
+    renderPerkShop();
     updateLoadoutSummary();
+  }
+
+  function ownsShip(id) {
+    const owned = progress().ownedShips || [];
+    return owned.includes(id);
   }
 
   function renderShips() {
     const row = $('#flight-ships');
     if (!row) return;
-    row.innerHTML = SHIPS.map(s =>
-      `<button type="button" class="flight-ship-btn ${s.id === shipId ? 'selected' : ''}" data-ship="${s.id}" aria-pressed="${s.id === shipId}">
+    const prog = progress();
+    row.innerHTML = SHIPS.map(s => {
+      const owned = ownsShip(s.id);
+      const selected = s.id === shipId;
+      const costLabel = owned ? (selected ? 'Equipped' : 'Owned') : `🪙 ${s.cost}`;
+      return `<button type="button" class="flight-ship-btn ${selected ? 'selected' : ''} ${owned ? '' : 'locked'}" data-ship="${s.id}" aria-pressed="${selected}">
+        <span class="flight-ship-tier">T${s.tier}</span>
         <span class="flight-ship-emoji">${s.emoji}</span>
         <span class="flight-ship-name">${s.name}</span>
         <span class="flight-ship-tip">${s.tip}</span>
-      </button>`
-    ).join('');
+        <span class="flight-shop-cost">${costLabel}</span>
+      </button>`;
+    }).join('');
     row.querySelectorAll('[data-ship]').forEach(btn => {
       btn.addEventListener('click', () => {
-        shipId = btn.dataset.ship;
-        if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
-        renderShips();
-        updateLoadoutSummary();
+        const id = btn.dataset.ship;
+        const s = SHIPS.find(x => x.id === id);
+        if (!s) return;
+        if (ownsShip(id)) {
+          shipId = id;
+          if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+          persistLoadout();
+          renderHangarShop();
+          return;
+        }
+        if ((prog.points || 0) < s.cost) {
+          setPrompt(`Need ${s.cost} points for ${s.name} — keep flying to earn more!`);
+          if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
+          return;
+        }
+        buyShip(s);
       });
     });
   }
 
-  function renderUpgrades() {
+  function buyShip(s) {
+    const prog = progress();
+    if (ownsShip(s.id)) return;
+    if ((prog.points || 0) < s.cost) return;
+    const owned = prog.ownedShips.slice();
+    owned.push(s.id);
+    saveProgressPatch({
+      points: prog.points - s.cost,
+      ownedShips: owned,
+      lastShipId: s.id
+    });
+    shipId = s.id;
+    if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
+    setPrompt(`Bought ${s.emoji} ${s.name}! Equipped and ready.`);
+    renderHangarShop();
+  }
+
+  function renderWeaponShop() {
+    const row = $('#flight-weapon-shop');
+    if (!row) return;
+    const prog = progress();
+    const levels = prog.weaponLevels || {};
+    row.innerHTML = WEAPON_SHOP.map(w => {
+      const lvl = levels[w.id] || 0;
+      const maxed = lvl >= w.maxLevel;
+      const nextCost = w.cost + lvl * Math.round(w.cost * 0.5);
+      const costLabel = maxed ? `Lv ${lvl} MAX` : `Lv ${lvl} → ${lvl + 1} · 🪙 ${nextCost}`;
+      return `<button type="button" class="flight-upgrade-btn flight-shop-btn ${lvl > 0 ? 'owned' : ''} ${maxed ? 'maxed' : ''}" data-weapon-buy="${w.id}">
+        <span class="flight-upgrade-emoji">${w.emoji}</span>
+        <span class="flight-upgrade-name">${w.label}</span>
+        <span class="flight-upgrade-tip">${w.tip}</span>
+        <span class="flight-shop-cost">${costLabel}</span>
+      </button>`;
+    }).join('');
+    row.querySelectorAll('[data-weapon-buy]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.weaponBuy;
+        buyWeaponLevel(id);
+      });
+    });
+  }
+
+  function buyWeaponLevel(id) {
+    const def = WEAPON_SHOP.find(w => w.id === id);
+    if (!def) return;
+    const prog = progress();
+    const levels = Object.assign({ damage: 0, firerate: 0, multishot: 0 }, prog.weaponLevels || {});
+    const lvl = levels[id] || 0;
+    if (lvl >= def.maxLevel) {
+      setPrompt(`${def.label} is already maxed!`);
+      if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
+      return;
+    }
+    const cost = def.cost + lvl * Math.round(def.cost * 0.5);
+    if ((prog.points || 0) < cost) {
+      setPrompt(`Need ${cost} points for ${def.label} — earn more in flight!`);
+      if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
+      return;
+    }
+    levels[id] = lvl + 1;
+    saveProgressPatch({ points: prog.points - cost, weaponLevels: levels });
+    if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
+    setPrompt(`${def.emoji} ${def.label} upgraded to level ${levels[id]}!`);
+    renderHangarShop();
+  }
+
+  function renderPerkShop() {
     const row = $('#flight-upgrades');
     if (!row) return;
-    row.innerHTML = UPGRADES.map(u => {
-      const on = !!upgrades[u.id];
-      return `<button type="button" class="flight-upgrade-btn ${on ? 'selected' : ''}" data-upgrade="${u.id}" aria-pressed="${on}">
+    const prog = progress();
+    row.innerHTML = PERK_SHOP.map(u => {
+      const owned = prog.ownedPerks.includes(u.id);
+      const on = !!equippedPerks[u.id];
+      let costLabel;
+      if (!owned) costLabel = `Buy · 🪙 ${u.cost}`;
+      else if (on) costLabel = 'Equipped ✓';
+      else costLabel = 'Tap to equip';
+      return `<button type="button" class="flight-upgrade-btn ${on ? 'selected' : ''} ${owned ? 'owned' : 'locked'}" data-perk="${u.id}" aria-pressed="${on}">
         <span class="flight-upgrade-emoji">${u.emoji}</span>
         <span class="flight-upgrade-name">${u.label}</span>
         <span class="flight-upgrade-tip">${u.tip}</span>
+        <span class="flight-shop-cost">${costLabel}</span>
       </button>`;
     }).join('');
-    row.querySelectorAll('[data-upgrade]').forEach(btn => {
+    row.querySelectorAll('[data-perk]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const id = btn.dataset.upgrade;
-        if (upgrades[id]) {
-          upgrades[id] = false;
-        } else if (upgradeCount() < 2) {
-          upgrades[id] = true;
+        const id = btn.dataset.perk;
+        const def = PERK_SHOP.find(p => p.id === id);
+        if (!def) return;
+        const p = progress();
+        if (!p.ownedPerks.includes(id)) {
+          if ((p.points || 0) < def.cost) {
+            setPrompt(`Need ${def.cost} points for ${def.label}!`);
+            if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
+            return;
+          }
+          const owned = p.ownedPerks.slice();
+          owned.push(id);
+          saveProgressPatch({ points: p.points - def.cost, ownedPerks: owned });
+          equippedPerks[id] = true;
+          // Cap equip
+          while (perkEquippedCount() > MAX_EQUIP_PERKS) {
+            const other = PERK_SHOP.map(x => x.id).find(x => x !== id && equippedPerks[x]);
+            if (other) equippedPerks[other] = false;
+            else break;
+          }
+          if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
+          setPrompt(`Bought ${def.emoji} ${def.label}! Equipped for this flight.`);
+          persistLoadout();
+          renderHangarShop();
+          return;
+        }
+        if (equippedPerks[id]) {
+          equippedPerks[id] = false;
+        } else if (perkEquippedCount() < MAX_EQUIP_PERKS) {
+          equippedPerks[id] = true;
         } else {
-          setPrompt('Pick only 2 boosts — tap one to turn it off first!');
+          setPrompt(`Equip only ${MAX_EQUIP_PERKS} perks — tap one to turn it off first!`);
           if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
           return;
         }
         if (global.KidsAudio && KidsAudio.click) KidsAudio.click();
-        renderUpgrades();
-        updateLoadoutSummary();
+        persistLoadout();
+        renderHangarShop();
       });
     });
   }
 
   function updateLoadoutSummary() {
     const s = ship();
-    const boosts = UPGRADES.filter(u => upgrades[u.id]).map(u => u.emoji + ' ' + u.label);
+    const prog = progress();
+    const perkList = PERK_SHOP.filter(u => equippedPerks[u.id]).map(u => u.emoji + ' ' + u.label);
+    const wl = prog.weaponLevels || {};
+    const wBits = [];
+    if (wl.damage) wBits.push('💥×' + wl.damage);
+    if (wl.firerate) wBits.push('⚡×' + wl.firerate);
+    if (wl.multishot) wBits.push('🎯×' + wl.multishot);
     const preview = $('#flight-plane-preview');
-    if (preview) preview.textContent = s.emoji + (boosts.length ? ' ' + boosts.map(b => b.split(' ')[0]).join('') : '');
+    if (preview) {
+      preview.textContent = s.emoji + (perkList.length ? ' ' + perkList.map(b => b.split(' ')[0]).join('') : '');
+    }
     const sum = $('#flight-loadout-summary');
     if (sum) {
-      sum.textContent = boosts.length
-        ? `${s.name} · ${boosts.join(' · ')}`
-        : `${s.name} · no boosts (still fun!)`;
+      const parts = [s.name];
+      if (wBits.length) parts.push(wBits.join(' '));
+      if (perkList.length) parts.push(perkList.join(' · '));
+      else parts.push('no perks');
+      sum.textContent = parts.join(' · ');
     }
     const status = $('#flight-build-status');
     if (status) {
-      status.textContent = boosts.length
-        ? `✅ ${s.name} + ${boosts.length} boost${boosts.length > 1 ? 's' : ''}`
-        : `✅ ${s.name} ready — boosts optional`;
+      status.textContent = `✅ ${s.name}` + (perkList.length ? ` + ${perkList.length} perk${perkList.length > 1 ? 's' : ''}` : ' ready');
     }
     const startBtn = $('#flight-start-flight');
     if (startBtn) {
       startBtn.disabled = false;
       startBtn.classList.add('ready');
     }
+  }
+
+  function persistLoadout() {
+    saveProgressPatch({
+      lastShipId: shipId,
+      lastUpgrades: {
+        speed: !!equippedPerks.speed,
+        fire: false,
+        shield: !!equippedPerks.shield,
+        magnet: !!equippedPerks.magnet,
+        burst: !!equippedPerks.burst
+      }
+    });
   }
 
   function sizeCanvas(canvas) {
@@ -409,6 +687,7 @@
       return;
     }
     stopLoop();
+    persistLoadout();
     prepareArena();
     updateHud();
     setPrompt('Get ready…');
@@ -444,9 +723,13 @@
     const wd = world();
     const diff = difficulty();
     const sh = ship();
+    const prog = progress();
+    const wl = prog.weaponLevels || {};
     const arena = wd.arena;
-    const maxSpeed = diff.maxSpeed * sh.thrust * (upgrades.speed ? 1.28 : 1);
-    const fireMs = diff.fireMs / (sh.fire * (upgrades.fire ? 1.45 : 1));
+    const speedMul = (equippedPerks.speed ? 1.28 : 1);
+    const fireMul = (1 + (wl.firerate || 0) * 0.22);
+    const maxSpeed = diff.maxSpeed * sh.thrust * speedMul;
+    const fireMs = diff.fireMs / (sh.fire * fireMul);
     plane = {
       x: arena / 2,
       y: arena / 2,
@@ -455,20 +738,27 @@
       angle: -Math.PI / 2,
       alive: true,
       invuln: 0,
-      shield: upgrades.shield ? 3 : 1,
+      shield: equippedPerks.shield ? 3 : 1,
       maxSpeed,
       fireMs,
       turn: diff.turn * sh.turn,
-      thrust: diff.thrust * sh.thrust * (upgrades.speed ? 1.2 : 1),
-      r: isPrek() ? 26 : 22
+      thrust: diff.thrust * sh.thrust * (equippedPerks.speed ? 1.2 : 1),
+      r: isPrek() ? 22 : 18,
+      damageLvl: wl.damage || 0,
+      multiLvl: wl.multishot || 0,
+      magnet: !!equippedPerks.magnet,
+      longBurst: !!equippedPerks.burst
     };
     bullets = [];
     particles = [];
     score = 0;
+    pointsEarnedRun = 0;
     collected = { stars: 0, kills: 0 };
     flightDone = false;
     fireCooldown = 0;
     flavor = pickFlavor();
+    activeWeapon = 'normal';
+    stationCooldown = {};
     entities = spawnArena(wd, arena);
     cam = { x: plane.x, y: plane.y };
     keys = {};
@@ -494,17 +784,28 @@
   function pickFlavor() {
     const lines = [
       'Blast those soft targets!',
+      'Fly into glowing upgrade pads!',
       'Fox power — keep flying!',
       'Stars ahead, pilot!',
-      'Bounce off the soft walls!',
       'Zap drones · grab stars!'
     ];
     return lines[Math.floor(Math.random() * lines.length)];
   }
 
+  function stationPositions(arena) {
+    const m = arena * 0.22;
+    const c = arena / 2;
+    return [
+      { x: m, y: m },
+      { x: arena - m, y: m },
+      { x: m, y: arena - m },
+      { x: arena - m, y: arena - m }
+    ];
+  }
+
   function spawnArena(wd, arena) {
     const list = [];
-    const margin = 80;
+    const margin = 100;
     const rand = (a, b) => a + Math.random() * (b - a);
     const awayFromCenter = () => {
       let x, y, tries = 0;
@@ -512,9 +813,29 @@
         x = rand(margin, arena - margin);
         y = rand(margin, arena - margin);
         tries++;
-      } while (tries < 20 && Math.hypot(x - arena / 2, y - arena / 2) < 180);
+      } while (tries < 20 && Math.hypot(x - arena / 2, y - arena / 2) < 220);
       return { x, y };
     };
+
+    const spots = stationPositions(arena);
+    STATIONS.forEach((st, i) => {
+      const p = spots[i] || awayFromCenter();
+      list.push({
+        type: 'station',
+        stationId: st.id,
+        weapon: st.weapon,
+        name: st.name,
+        short: st.short,
+        emoji: st.emoji,
+        color: st.color,
+        tip: st.tip,
+        x: p.x,
+        y: p.y,
+        r: 42,
+        glow: 0,
+        got: false
+      });
+    });
 
     const enemyN = isPrek() ? Math.max(4, wd.enemies - 3) : wd.enemies;
     for (let i = 0; i < enemyN; i++) {
@@ -527,7 +848,7 @@
         y: p.y,
         vx: Math.cos(ang) * spd,
         vy: Math.sin(ang) * spd,
-        r: isPrek() ? 28 : 24,
+        r: isPrek() ? 26 : 22,
         emoji: wd.enemyEmoji,
         hp: 1,
         points: 15
@@ -544,7 +865,7 @@
         y: p.y,
         vx: Math.cos(ang) * spd,
         vy: Math.sin(ang) * spd,
-        r: 20 + Math.random() * 16,
+        r: 18 + Math.random() * 14,
         emoji: wd.rockEmoji,
         hp: 1,
         points: 10,
@@ -557,7 +878,7 @@
         type: 'star',
         x: p.x,
         y: p.y,
-        r: isPrek() ? 26 : 22,
+        r: isPrek() ? 24 : 20,
         emoji: wd.starEmoji,
         got: false,
         points: 25,
@@ -580,13 +901,13 @@
   function respawnTarget(type) {
     const wd = world();
     const arena = wd.arena;
-    const margin = 80;
+    const margin = 100;
     let x, y, tries = 0;
     do {
       x = margin + Math.random() * (arena - margin * 2);
       y = margin + Math.random() * (arena - margin * 2);
       tries++;
-    } while (tries < 25 && plane && Math.hypot(x - plane.x, y - plane.y) < 220);
+    } while (tries < 25 && plane && Math.hypot(x - plane.x, y - plane.y) < 260);
     const ang = Math.random() * Math.PI * 2;
     if (type === 'enemy') {
       const spd = 0.6 + Math.random() * 1.1;
@@ -595,7 +916,7 @@
         x, y,
         vx: Math.cos(ang) * spd,
         vy: Math.sin(ang) * spd,
-        r: isPrek() ? 28 : 24,
+        r: isPrek() ? 26 : 22,
         emoji: wd.enemyEmoji,
         hp: 1,
         points: 15
@@ -608,7 +929,7 @@
         x, y,
         vx: Math.cos(ang) * spd,
         vy: Math.sin(ang) * spd,
-        r: 20 + Math.random() * 16,
+        r: 18 + Math.random() * 14,
         emoji: wd.rockEmoji,
         hp: 1,
         points: 10,
@@ -618,7 +939,7 @@
     return {
       type: 'star',
       x, y,
-      r: isPrek() ? 26 : 22,
+      r: isPrek() ? 24 : 20,
       emoji: wd.starEmoji,
       got: false,
       points: 25,
@@ -639,6 +960,11 @@
     if (t) {
       t.textContent = formatTime(sessionLeft);
       t.parentElement && t.parentElement.classList.toggle('flight-timer-low', sessionLeft <= 60);
+    }
+    const we = $('#flight-weapon-hud');
+    if (we) {
+      const stDef = STATIONS.find(x => x.weapon === activeWeapon);
+      we.textContent = stDef ? `${stDef.emoji} ${stDef.short}` : '🔫 Normal';
     }
   }
 
@@ -673,6 +999,31 @@
     return !!(keys[' '] || keys.Spacebar || pad.fire || fireHeld);
   }
 
+  function addScore(pts) {
+    score += pts;
+    pointsEarnedRun += pts;
+  }
+
+  function applyStation(e) {
+    const id = e.stationId || e.weapon;
+    const now = performance.now();
+    if (stationCooldown[id] && now - stationCooldown[id] < 2500) return;
+    stationCooldown[id] = now;
+
+    if (e.weapon === 'shieldpad') {
+      plane.shield = Math.min(5, (plane.shield || 0) + 2);
+      plane.invuln = Math.max(plane.invuln, 50);
+      flavor = '🛡️ Shield buoy — bubbles up!';
+    } else {
+      activeWeapon = e.weapon;
+      flavor = `${e.emoji} ${e.name} unlocked for this flight!`;
+    }
+    spawnSparks(e.x, e.y, e.color || '#ffeaa7', 14);
+    if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
+    // Small point bonus for visiting
+    addScore(5);
+  }
+
   function stepPhysics(viewW, viewH, dt) {
     const wd = world();
     const arena = wd.arena;
@@ -692,12 +1043,10 @@
     if (brake) {
       plane.vx *= Math.pow(0.92, dt * 60);
       plane.vy *= Math.pow(0.92, dt * 60);
-      // gentle reverse
       plane.vx -= Math.cos(plane.angle) * plane.thrust * 0.35 * (dt * 60);
       plane.vy -= Math.sin(plane.angle) * plane.thrust * 0.35 * (dt * 60);
     }
 
-    // Drag
     plane.vx *= Math.pow(0.985, dt * 60);
     plane.vy *= Math.pow(0.985, dt * 60);
 
@@ -710,7 +1059,6 @@
     plane.x += plane.vx * (dt * 60);
     plane.y += plane.vy * (dt * 60);
 
-    // Soft walls — bounce, never fall off
     const padWall = plane.r + 8;
     if (plane.x < padWall) { plane.x = padWall; plane.vx = Math.abs(plane.vx) * 0.55; }
     if (plane.x > arena - padWall) { plane.x = arena - padWall; plane.vx = -Math.abs(plane.vx) * 0.55; }
@@ -719,42 +1067,61 @@
 
     if (plane.invuln > 0) plane.invuln -= dt * 60;
 
-    // Camera follow
     cam.x += (plane.x - cam.x) * Math.min(1, 0.12 * (dt * 60));
     cam.y += (plane.y - cam.y) * Math.min(1, 0.12 * (dt * 60));
 
-    // Fire
+    // Fire rate: rapid station overrides
+    let fireMs = plane.fireMs;
+    if (activeWeapon === 'rapid') fireMs = Math.max(90, plane.fireMs * 0.45);
+    else if (activeWeapon === 'missile') fireMs = plane.fireMs * 1.55;
+
     fireCooldown = Math.max(0, fireCooldown - dt * 1000);
     if (wantsFire() && fireCooldown <= 0) {
       shoot();
-      fireCooldown = plane.fireMs;
+      fireCooldown = fireMs;
     }
 
     // Bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
+      if (b.seek && plane) {
+        // Mild seek toward nearest enemy
+        let best = null;
+        let bestD = 280;
+        for (const e of entities) {
+          if (e.type !== 'enemy' && e.type !== 'asteroid') continue;
+          if (e.hp <= 0) continue;
+          const d = Math.hypot(e.x - b.x, e.y - b.y);
+          if (d < bestD) { bestD = d; best = e; }
+        }
+        if (best) {
+          const ang = Math.atan2(best.y - b.y, best.x - b.x);
+          const spdB = Math.hypot(b.vx, b.vy) || 10;
+          b.vx = b.vx * 0.85 + Math.cos(ang) * spdB * 0.15;
+          b.vy = b.vy * 0.85 + Math.sin(ang) * spdB * 0.15;
+        }
+      }
       b.x += b.vx * (dt * 60);
       b.y += b.vy * (dt * 60);
       b.life -= dt;
-      if (b.life <= 0 || b.x < -40 || b.y < -40 || b.x > arena + 40 || b.y > arena + 40) {
+      if (b.life <= 0 || b.x < -80 || b.y < -80 || b.x > arena + 80 || b.y > arena + 80) {
         bullets.splice(i, 1);
         continue;
       }
-      // Hit enemies / asteroids
       for (let j = entities.length - 1; j >= 0; j--) {
         const e = entities[j];
         if (e.type !== 'enemy' && e.type !== 'asteroid') continue;
         if (e.hp <= 0) continue;
         if (Math.hypot(b.x - e.x, b.y - e.y) < e.r + b.r) {
-          e.hp -= 1;
+          const dmg = b.damage || 1;
+          e.hp -= dmg;
           bullets.splice(i, 1);
           if (e.hp <= 0) {
             popDestroy(e);
-            score += e.points;
+            addScore(e.points);
             collected.kills++;
             const kind = e.type;
             entities.splice(j, 1);
-            // Respawn after a beat so arena stays lively
             setTimeout(() => {
               if (mode === 'fly' && !flightDone) entities.push(respawnTarget(kind));
             }, 900 + Math.random() * 1200);
@@ -768,14 +1135,28 @@
       }
     }
 
-    // Move enemies / asteroids with soft walls
+    // Move enemies / asteroids; bob stars; glow stations
     for (const e of entities) {
-      if (e.type === 'bg' || e.type === 'star') {
-        if (e.type === 'star') e.bob = (e.bob || 0) + dt * 3;
+      if (e.type === 'bg') continue;
+      if (e.type === 'station') {
+        e.glow = (e.glow || 0) + dt * 3;
+        continue;
+      }
+      if (e.type === 'star') {
+        e.bob = (e.bob || 0) + dt * 3;
+        // Magnet perk
+        if (plane && plane.magnet) {
+          const dx = plane.x - e.x;
+          const dy = plane.y - e.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 160 && dist > 1) {
+            e.x += (dx / dist) * 2.2 * (dt * 60);
+            e.y += (dy / dist) * 2.2 * (dt * 60);
+          }
+        }
         continue;
       }
       if (e.type === 'enemy' || e.type === 'asteroid') {
-        // Mild chase for enemies
         if (e.type === 'enemy' && plane) {
           const dx = plane.x - e.x;
           const dy = plane.y - e.y;
@@ -801,16 +1182,20 @@
       }
     }
 
-    // Plane vs collectibles / bumps
+    // Plane vs collectibles / stations / bumps
     for (let j = entities.length - 1; j >= 0; j--) {
       const e = entities[j];
       if (e.type === 'bg') continue;
       if (e.got) continue;
       const dist = Math.hypot(e.x - plane.x, e.y - plane.y);
+      if (e.type === 'station') {
+        if (dist < e.r + plane.r - 4) applyStation(e);
+        continue;
+      }
       if (dist < e.r + plane.r - diff.hitPad) {
         if (e.type === 'star') {
           e.got = true;
-          score += e.points;
+          addScore(e.points);
           collected.stars++;
           spawnSparks(e.x, e.y, '#ffd93d', 8);
           if (global.KidsAudio && KidsAudio.star) KidsAudio.star();
@@ -825,7 +1210,6 @@
       }
     }
 
-    // Particles
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.x += p.vx * (dt * 60);
@@ -836,7 +1220,6 @@
   }
 
   function softBump(e) {
-    // Bounce plane away; spend shield pip if any
     const dx = plane.x - e.x;
     const dy = plane.y - e.y;
     const dist = Math.hypot(dx, dy) || 1;
@@ -857,21 +1240,57 @@
     if (global.KidsAudio && KidsAudio.wrong) KidsAudio.wrong();
   }
 
-  function shoot() {
-    if (!plane) return;
-    const diff = difficulty();
-    const sh = ship();
-    const ang = plane.angle;
-    const speed = diff.bulletSpeed;
+  function pushBullet(ang, speed, opts) {
+    const o = opts || {};
+    const lifeBase = plane.longBurst ? 1.55 : 1.1;
+    const dmgBonus = 1 + (plane.damageLvl || 0) * 0.35;
+    const rBonus = 5 + (plane.damageLvl || 0) * 1.5 + (o.big ? 4 : 0);
     bullets.push({
       x: plane.x + Math.cos(ang) * (plane.r + 6),
       y: plane.y + Math.sin(ang) * (plane.r + 6),
       vx: Math.cos(ang) * speed + plane.vx * 0.3,
       vy: Math.sin(ang) * speed + plane.vy * 0.3,
-      r: 5,
-      life: 1.1,
-      color: sh.color
+      r: o.r || rBonus,
+      life: o.life || lifeBase,
+      color: o.color || ship().color,
+      damage: o.damage || dmgBonus,
+      seek: !!o.seek
     });
+  }
+
+  function shoot() {
+    if (!plane) return;
+    const diff = difficulty();
+    const sh = ship();
+    const ang = plane.angle;
+    let speed = diff.bulletSpeed;
+    const multi = plane.multiLvl || 0;
+
+    if (activeWeapon === 'missile') {
+      speed = diff.bulletSpeed * 0.75;
+      pushBullet(ang, speed, { color: '#fd79a8', r: 9 + (plane.damageLvl || 0), life: plane.longBurst ? 2.1 : 1.6, damage: 2 + (plane.damageLvl || 0), seek: true, big: true });
+    } else if (activeWeapon === 'spread') {
+      const spread = [-0.28, -0.12, 0, 0.12, 0.28];
+      const use = multi >= 2 ? spread : (multi >= 1 ? [-0.22, 0, 0.22] : [-0.2, 0, 0.2]);
+      use.forEach(off => pushBullet(ang + off, speed * 0.95, { color: '#a29bfe' }));
+    } else if (activeWeapon === 'rapid') {
+      pushBullet(ang, speed * 1.1, { color: '#ff7675', life: plane.longBurst ? 1.2 : 0.85 });
+      if (multi >= 1) {
+        pushBullet(ang - 0.08, speed * 1.05, { color: '#ff7675', life: 0.8 });
+        pushBullet(ang + 0.08, speed * 1.05, { color: '#ff7675', life: 0.8 });
+      }
+    } else {
+      // Normal + permanent multi-shot levels
+      if (multi >= 2) {
+        [-0.18, 0, 0.18].forEach(off => pushBullet(ang + off, speed, { color: sh.color }));
+      } else if (multi >= 1) {
+        [-0.12, 0.12].forEach(off => pushBullet(ang + off, speed, { color: sh.color }));
+        pushBullet(ang, speed, { color: sh.color });
+      } else {
+        pushBullet(ang, speed, { color: sh.color });
+      }
+    }
+
     spawnSparks(
       plane.x + Math.cos(ang) * plane.r,
       plane.y + Math.sin(ang) * plane.r,
@@ -884,7 +1303,6 @@
   function popDestroy(e) {
     spawnSparks(e.x, e.y, '#ffeaa7', 12);
     spawnSparks(e.x, e.y, '#74b9ff', 6);
-    // Soft “poof” emoji particle
     particles.push({
       x: e.x, y: e.y, vx: 0, vy: -0.6, life: 0.55,
       emoji: '💨', size: 22
@@ -915,54 +1333,81 @@
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    const ox = w / 2 - cam.x;
-    const oy = h / 2 - cam.y;
-
-    // Arena floor tint
+    // Zoomed-out camera: scale world so more arena fits on screen
     ctx.save();
-    ctx.translate(ox, oy);
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(CAM_ZOOM, CAM_ZOOM);
+    ctx.translate(-cam.x, -cam.y);
+
     ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fillRect(0, 0, arena, arena);
 
-    // Soft wall glow
     ctx.strokeStyle = wd.accent;
     ctx.globalAlpha = 0.55;
-    ctx.lineWidth = 10;
+    ctx.lineWidth = 14;
     ctx.strokeRect(4, 4, arena - 8, arena - 8);
     ctx.globalAlpha = 0.25;
-    ctx.lineWidth = 22;
+    ctx.lineWidth = 28;
     ctx.strokeRect(0, 0, arena, arena);
     ctx.globalAlpha = 1;
 
-    // Grid dots for orientation
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    for (let gx = 80; gx < arena; gx += 80) {
-      for (let gy = 80; gy < arena; gy += 80) {
+    for (let gx = 100; gx < arena; gx += 100) {
+      for (let gy = 100; gy < arena; gy += 100) {
         ctx.beginPath();
-        ctx.arc(gx, gy, 2, 0, Math.PI * 2);
+        ctx.arc(gx, gy, 2.5, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-    // Background bits
     for (const e of entities) {
       if (e.type !== 'bg') continue;
       ctx.globalAlpha = 0.4;
-      ctx.font = '22px serif';
+      ctx.font = '20px serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(e.emoji, e.x, e.y);
       ctx.globalAlpha = 1;
     }
 
-    // Stars / enemies / asteroids
+    // Upgrade stations — glow + label
     for (const e of entities) {
-      if (e.type === 'bg' || e.got) continue;
+      if (e.type !== 'station') continue;
+      const pulse = 0.55 + Math.sin(e.glow || 0) * 0.25;
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.beginPath();
+      ctx.fillStyle = e.color;
+      ctx.globalAlpha = 0.2 * pulse;
+      ctx.arc(0, 0, e.r + 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.55 * pulse;
+      ctx.strokeStyle = e.color;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, 0, e.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.font = '28px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(e.emoji, 0, -4);
+      ctx.font = 'bold 13px system-ui, sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(e.short || e.name, 0, e.r + 14);
+      ctx.fillText(e.short || e.name, 0, e.r + 14);
+      ctx.restore();
+    }
+
+    for (const e of entities) {
+      if (e.type === 'bg' || e.type === 'station' || e.got) continue;
       const bobY = e.type === 'star' ? Math.sin(e.bob || 0) * 4 : 0;
       ctx.save();
       ctx.translate(e.x, e.y + bobY);
       if (e.angle) ctx.rotate(e.angle);
-      ctx.font = `${e.type === 'asteroid' ? Math.round(e.r * 1.6) : 30}px serif`;
+      ctx.font = `${e.type === 'asteroid' ? Math.round(e.r * 1.6) : 28}px serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(e.emoji, 0, 0);
@@ -976,7 +1421,6 @@
       ctx.restore();
     }
 
-    // Bullets
     for (const b of bullets) {
       ctx.beginPath();
       ctx.fillStyle = b.color || '#ffeaa7';
@@ -987,7 +1431,6 @@
       ctx.shadowBlur = 0;
     }
 
-    // Particles
     for (const p of particles) {
       if (p.emoji) {
         ctx.globalAlpha = Math.max(0, p.life * 2);
@@ -1006,11 +1449,9 @@
       }
     }
 
-    // Plane — faces travel/aim direction (top-down)
     if (plane) {
       const blink = plane.invuln > 0 && (Math.floor(plane.invuln) % 6 < 3);
       if (!blink) drawPlaneTopDown(ctx, plane.x, plane.y, plane.angle);
-      // Shield ring
       if (plane.shield > 0) {
         ctx.beginPath();
         ctx.strokeStyle = 'rgba(116,185,255,0.65)';
@@ -1022,12 +1463,10 @@
 
     ctx.restore();
 
-    // Mini-map
     drawMinimap(ctx, w, h, arena);
 
-    // Edge vignette hint when near wall
     if (plane) {
-      const near = 120;
+      const near = 140;
       if (plane.x < near || plane.y < near || plane.x > arena - near || plane.y > arena - near) {
         ctx.strokeStyle = 'rgba(255,217,61,0.35)';
         ctx.lineWidth = 6;
@@ -1041,44 +1480,40 @@
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
-    // Simple geometric plane (nose points +X / angle direction)
     ctx.fillStyle = sh.color;
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(22, 0);
-    ctx.lineTo(-14, 12);
-    ctx.lineTo(-8, 0);
-    ctx.lineTo(-14, -12);
+    ctx.moveTo(20, 0);
+    ctx.lineTo(-12, 11);
+    ctx.lineTo(-7, 0);
+    ctx.lineTo(-12, -11);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    // Wings
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.beginPath();
     ctx.moveTo(2, 0);
-    ctx.lineTo(-6, 18);
-    ctx.lineTo(-10, 0);
-    ctx.lineTo(-6, -18);
+    ctx.lineTo(-5, 16);
+    ctx.lineTo(-9, 0);
+    ctx.lineTo(-5, -16);
     ctx.closePath();
     ctx.fill();
-    // Cockpit
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(4, 0, 4, 0, Math.PI * 2);
+    ctx.arc(4, 0, 3.5, 0, Math.PI * 2);
     ctx.fill();
-    // Emoji badge
     ctx.rotate(-angle);
-    ctx.font = '16px serif';
+    ctx.font = '14px serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(sh.emoji, 0, -26);
+    ctx.fillText(sh.emoji, 0, -22);
     ctx.restore();
   }
 
   function drawMinimap(ctx, w, h, arena) {
-    const mw = 72;
-    const mh = 72;
+    const mw = 78;
+    const mh = 78;
     const mx = w - mw - 10;
     const my = 10;
     const scale = mw / arena;
@@ -1088,6 +1523,13 @@
     ctx.fillRect(mx, my, mw, mh);
     for (const e of entities) {
       if (e.type === 'bg' || e.got) continue;
+      if (e.type === 'station') {
+        ctx.fillStyle = e.color || '#fff';
+        ctx.beginPath();
+        ctx.arc(mx + e.x * scale, my + e.y * scale, 3, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       ctx.fillStyle = e.type === 'star' ? '#ffd93d' : (e.type === 'enemy' ? '#ff7675' : '#dfe6e9');
       ctx.fillRect(mx + e.x * scale - 1.5, my + e.y * scale - 1.5, 3, 3);
     }
@@ -1114,10 +1556,12 @@
 
     const timeup = reason === 'timeup';
     const nextUnlock = worldIdx + 1;
+    const pointsGained = Math.max(0, Math.round(pointsEarnedRun || score));
 
     const progressPatch = {
       completedDelta: success ? 1 : 0,
       score,
+      pointsGained,
       starsEarned: earned,
       worldId: worldIdx,
       unlockWorld: (success && nextUnlock < WORLDS.length) ? nextUnlock : null,
@@ -1128,7 +1572,13 @@
       timeup: !!timeup,
       lockFlight: !!timeup,
       shipId,
-      upgrades: Object.assign({}, upgrades)
+      upgrades: {
+        speed: !!equippedPerks.speed,
+        fire: false,
+        shield: !!equippedPerks.shield,
+        magnet: !!equippedPerks.magnet,
+        burst: !!equippedPerks.burst
+      }
     };
 
     showPanel('results');
@@ -1148,6 +1598,7 @@
     if (body) {
       body.textContent =
         `${world().emoji} ${world().name} · Score ${score} · Hits ${collected.kills} · Stars ${collected.stars}` +
+        ` · 🪙 +${pointsGained} hangar points` +
         (progressPatch.unlockWorld != null ? ' · New world unlocked!' : '') +
         (timeup ? ' · Session saved.' : '');
     }
@@ -1167,7 +1618,7 @@
     setPrompt(
       timeup
         ? `Fly time's up! Answer ${QUESTIONS_TO_UNLOCK} questions in Science (or Math / Reading / Spelling) to unlock more flight.`
-        : 'Great run! Fly again or pick another world.'
+        : `Great run! +${pointsGained} points — spend them in the hangar!`
     );
   }
 
@@ -1276,7 +1727,6 @@
     flightDone = true;
   }
 
-  /** Called by app when a Math/Reading/Spelling/Science answer is logged while gate is active. */
   function notifyGateAnswer(subject) {
     const name = String(subject || '');
     const ok = GATE_SUBJECTS.some(s => s.toLowerCase() === name.toLowerCase());
@@ -1291,15 +1741,20 @@
       const gate = $('#flight-results-gate');
       if (gate) gate.classList.toggle('hidden', !isLocked());
     }
+    updatePointsUi();
   }
 
   global.FlightGame = {
     WORLDS,
     SHIPS,
     UPGRADES,
+    WEAPON_SHOP,
+    PERK_SHOP,
+    STATIONS,
     SESSION_SECONDS,
     QUESTIONS_TO_UNLOCK,
     GATE_SUBJECTS,
+    CAM_ZOOM,
     start,
     stop,
     getMode: () => mode,

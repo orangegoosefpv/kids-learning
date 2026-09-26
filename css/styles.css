@@ -2085,6 +2085,67 @@ code {
   color: #888;
   font-size: 0.9rem;
 }
+.flight-menu-points,
+.flight-shop-points {
+  font-weight: 800;
+  color: #6c5ce7;
+  margin: 4px 0 10px;
+}
+.flight-shop-points {
+  margin: 0;
+  padding: 4px 10px;
+  background: #f3efff;
+  border-radius: 999px;
+  border: 2px solid #a29bfe;
+}
+.flight-station-hint {
+  margin: 0;
+  padding: 10px 12px;
+  background: #fff8e7;
+  border: 2px dashed #ffd93d;
+  border-radius: 12px;
+  font-weight: 700;
+  color: #5a4a2a;
+  font-size: 0.95rem;
+}
+.flight-ship-tier {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #6c5ce7;
+  background: #efeaff;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.flight-shop-cost {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #00b894;
+  margin-top: 2px;
+}
+.flight-ship-btn.locked,
+.flight-upgrade-btn.locked {
+  border-color: #b2bec3;
+  background: #f1f2f6;
+  opacity: 0.92;
+}
+.flight-ship-btn.locked .flight-shop-cost,
+.flight-upgrade-btn.locked .flight-shop-cost {
+  color: #e17055;
+}
+.flight-upgrade-btn.owned {
+  border-color: #55efc4;
+}
+.flight-upgrade-btn.maxed {
+  border-color: #fdcb6e;
+  background: #fff9e8;
+}
+.flight-weapon-hud {
+  font-weight: 800;
+  color: #6c5ce7;
+  background: #efeaff;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
 .flight-ships,
 .flight-upgrades {
   display: grid;

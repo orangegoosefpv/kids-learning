@@ -444,7 +444,8 @@
       <p id="flight-prompt" class="level-info" aria-live="polite"></p>
 
       <div id="flight-panel-menu" class="flight-panel">
-        <p class="section-sub">Pick a sky world, choose your ship, then blast soft space targets!</p>
+        <p class="section-sub">Pick a sky world, visit the hangar shop, then blast soft space targets!</p>
+        <p id="flight-menu-points" class="flight-menu-points">🪙 Hangar points: <strong class="flight-points-bal">0</strong></p>
         <div id="flight-lock-banner" class="flight-lock-banner hidden" role="status" aria-live="polite">
           <div class="flight-lock-emoji">⏰</div>
           <h3 class="flight-lock-title">Fly time&rsquo;s up!</h3>
@@ -463,18 +464,24 @@
       <div id="flight-panel-build" class="flight-panel hidden">
         <div class="flight-build-toolbar">
           <button type="button" class="btn btn-sm" id="flight-back-menu">◀ Worlds</button>
-          <span id="flight-build-status" class="flight-build-status">Pick a ship + up to 2 boosts</span>
+          <span id="flight-shop-points" class="flight-shop-points">🪙 Points: <strong class="flight-points-bal">0</strong></span>
+          <span id="flight-build-status" class="flight-build-status">Hangar shop</span>
           <button type="button" class="btn btn-lg btn-success" id="flight-start-flight">🚀 Launch!</button>
         </div>
         <div class="flight-hangar">
           <div class="flight-hangar-block">
-            <h3 class="flight-hangar-title">1️⃣ Pick your ship</h3>
+            <h3 class="flight-hangar-title">1️⃣ Ships <span class="flight-boost-hint">(buy · equip)</span></h3>
             <div id="flight-ships" class="flight-ships" role="listbox" aria-label="Ship skins"></div>
           </div>
           <div class="flight-hangar-block">
-            <h3 class="flight-hangar-title">2️⃣ Pick boosts <span class="flight-boost-hint">(up to 2)</span></h3>
+            <h3 class="flight-hangar-title">2️⃣ Weapon upgrades <span class="flight-boost-hint">(permanent)</span></h3>
+            <div id="flight-weapon-shop" class="flight-upgrades" aria-label="Weapon upgrades"></div>
+          </div>
+          <div class="flight-hangar-block">
+            <h3 class="flight-hangar-title">3️⃣ Perks <span class="flight-boost-hint">(buy · equip up to 2)</span></h3>
             <div id="flight-upgrades" class="flight-upgrades"></div>
           </div>
+          <p class="flight-station-hint">🗺️ In flight: fly into glowing pads — Rapid Fire, Spread Shot, Shield Buoy, Missile!</p>
           <div class="flight-hangar-preview card">
             <div id="flight-plane-preview" class="flight-plane-preview" aria-hidden="true">🦊✈️</div>
             <p id="flight-loadout-summary" class="flight-loadout-summary">Fox Jet · ready!</p>
@@ -495,6 +502,7 @@
           <span>⭐ Score <strong id="flight-score">0</strong></span>
           <span>💥 Hits <strong id="flight-kills">0</strong></span>
           <span>🌟 <strong id="flight-stars-got">0</strong></span>
+          <span id="flight-weapon-hud" class="flight-weapon-hud" title="Active weapon">🔫 Normal</span>
           <span id="flight-flavor" class="flight-flavor">Blast those soft targets!</span>
         </div>
         <div class="flight-canvas-wrap flight-arena-wrap">
